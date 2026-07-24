@@ -1,0 +1,1535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>North Shore Paddling v44</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<!-- Leaflet loaded at end of body to guarantee DOM + script order -->
+
+<style>
+:root {
+  --navy: #0d2c54;
+  --navy-mid: #1e4fa1;
+  --navy-light: #2d6bb5;
+  --bg: #f0f4fa;
+  --card: #ffffff;
+  --text: #1a2a3a;
+  --subtext: #5a6a7a;
+
+  --below-bg: #ffe0d0;
+  --below-bar: #e05a2b;
+  --low-bg: #fffbe0;
+  --low-bar: #c8a800;
+  --medium-bg: #d8f5d8;
+  --medium-bar: #2e9e4f;
+  --high-bg: #eaf7c0;
+  --high-bar: #7db500;
+  --above-bg: #ffd8d8;
+  --above-bar: #d63b3b;
+  --nodata-bg: #f7f9fc;
+  --nodata-bar: #b0bec5;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Barlow', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* ── HEADER ── */
+header {
+  background: linear-gradient(135deg, #081d38 0%, #0d2c54 50%, #163d70 100%);
+  color: white;
+  padding: 12px 20px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(255,255,255,0.02) 0px,
+    rgba(255,255,255,0.02) 1px,
+    transparent 1px,
+    transparent 12px
+  );
+}
+header h1 {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  position: relative;
+}
+
+/* ── STICKY TOP ── */
+.sticky-top {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: var(--bg);
+  box-shadow: 0 2px 10px rgba(13,44,84,0.12);
+}
+.sticky-top .meta-bar { margin-bottom: 8px; }
+
+.cond-filter { position: relative; }
+.cond-filter button {
+  font-family: 'Barlow', sans-serif; font-size: 0.82rem; font-weight: 600;
+  color: var(--navy); background: white; border: none; padding: 6px 12px;
+  border-radius: 20px; box-shadow: 0 1px 6px rgba(13,44,84,0.12); cursor: pointer;
+}
+.cond-panel {
+  display: none; position: absolute; top: 110%; left: 0; z-index: 1200;
+  background: white; border-radius: 10px; padding: 8px 12px;
+  box-shadow: 0 6px 20px rgba(13,44,84,0.2); min-width: 130px;
+}
+.cond-panel.open { display: block; }
+.cond-panel label {
+  display: flex; align-items: center; gap: 7px; padding: 4px 0;
+  font-size: 0.83rem; color: var(--text); cursor: pointer; white-space: nowrap;
+}
+.cond-panel input { accent-color: var(--medium-bar); cursor: pointer; }
+
+.filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: nowrap;
+  margin-left: auto;
+  justify-content: flex-end;
+  align-items: center;
+}
+.filters select, .cond-filter button, #filtersToggle, .rain-badge {
+  font-family: 'Barlow', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--navy);
+  background: white;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 20px;
+  box-shadow: 0 1px 6px rgba(13,44,84,0.12);
+  cursor: pointer;
+  white-space: nowrap;
+}
+#filtersToggle { display: none; }  /* desktop: inline filters, no toggle */
+#filtersToggle.active { background: var(--navy); color: white; }
+.legend {
+  width: 100%;
+  justify-content: center;
+  margin-top: 6px;
+}
+
+/* ── MOBILE: collapse filters behind the Filters button ── */
+@media (max-width: 640px) {
+  #filtersToggle { display: inline-block; margin-left: auto; }
+  .filters {
+    display: none;
+    order: 99;
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .filters.open { display: flex; }
+  /* on mobile, render multi-select panels inline (no floating popup) */
+  .filters .cond-filter { width: 100%; }
+  .filters .cond-filter > button { display: none; }  /* label shown as heading instead */
+  .filters .cond-filter::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--subtext); font-weight: 700; margin: 4px 2px 2px;
+  }
+  .cond-panel {
+    position: static; box-shadow: none; padding: 6px 4px 2px;
+    min-width: 0; display: block;
+    columns: 2; -webkit-columns: 2;
+  }
+  .filters select { flex: 1 1 45%; }
+  .filters select, .cond-filter button, #filtersToggle, .rain-badge {
+    font-size: 0.78rem;
+    padding: 7px 10px;
+  }
+  .cond-panel label { font-size: 0.8rem; }
+}
+
+/* ── LAYOUT ── */
+.container { max-width: 1600px; margin: 0 auto; padding: 24px 20px; }
+
+.meta-bar {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.updated {
+  font-size: 0.82rem;
+  color: var(--subtext);
+  font-style: italic;
+}
+
+/* ── LEGEND ── */
+.legend {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text);
+  white-space: nowrap;
+}
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .legend {
+    flex-wrap: nowrap;
+    width: 100%;
+    justify-content: space-between;
+    gap: 4px;
+  }
+  .legend-item {
+    font-size: 0.62rem;
+    gap: 3px;
+    letter-spacing: 0.01em;
+  }
+  .legend-dot { width: 9px; height: 9px; }
+}
+
+/* ── CARD ── */
+.card {
+  background: var(--card);
+  border-radius: 14px;
+  margin-bottom: 28px;
+  box-shadow: 0 2px 16px rgba(13,44,84,0.09);
+  overflow: hidden;
+}
+.card-header {
+  background: var(--navy);
+  color: white;
+  padding: 14px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.card-header h2 {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.card-header .count {
+  font-size: 0.8rem;
+  opacity: 0.65;
+  font-weight: 400;
+  margin-left: 10px;
+}
+.toggle-btn {
+  background: rgba(255,255,255,0.15);
+  color: white;
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 6px;
+  padding: 4px 12px;
+  cursor: pointer;
+  font-family: 'Barlow', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  transition: background 0.2s;
+}
+.toggle-btn:hover { background: rgba(255,255,255,0.25); }
+
+/* ── TABLE ── */
+.table-wrap { overflow: auto; max-height: 70vh; }
+table { width: 100%; border-collapse: collapse; }
+thead th {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: #e8eef8;
+  color: var(--navy);
+  padding: 9px 12px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  box-shadow: inset 0 -2px 0 #ccd9ef;
+}
+thead th:hover { background: #d8e4f4; }
+thead th::after { content: ' ↕'; opacity: 0.4; font-size: 0.7rem; }
+thead th.sorted-asc::after { content: ' ↑'; opacity: 1; }
+thead th.sorted-desc::after { content: ' ↓'; opacity: 1; }
+
+tbody tr { transition: filter 0.1s; }
+tbody tr:hover { filter: brightness(0.96); }
+
+td {
+  padding: 9px 9px;
+  font-size: 0.88rem;
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* condition color bands applied to tr */
+tr.cond-below  td { background: var(--below-bg); }
+tr.cond-low    td { background: var(--low-bg); }
+tr.cond-medium td { background: var(--medium-bg); }
+tr.cond-high   td { background: var(--high-bg); }
+tr.cond-above  td { background: var(--above-bg); }
+tr.cond-nodata td { background: var(--nodata-bg); }
+
+/* left color bar */
+tr.cond-below  td:first-child { border-left: 4px solid var(--below-bar); }
+tr.cond-low    td:first-child { border-left: 4px solid var(--low-bar); }
+tr.cond-medium td:first-child { border-left: 4px solid var(--medium-bar); }
+tr.cond-high   td:first-child { border-left: 4px solid var(--high-bar); }
+tr.cond-above  td:first-child { border-left: 4px solid var(--above-bar); }
+tr.cond-nodata td:first-child { border-left: 4px solid var(--nodata-bar); }
+
+.river-name { font-weight: 600; color: var(--navy); }
+.trip-name a { color: var(--navy-mid); text-decoration: none; }
+.trip-name a:hover { text-decoration: underline; }
+.drive-cell, .num-cell, .flow-cell, .stage-cell {
+  text-align: right;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+}
+.cond-cell { text-align: center; }
+
+.trend-cell { text-align: center; white-space: nowrap; }
+.spark { vertical-align: middle; }
+
+.runnable-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--navy);
+  background: white;
+  padding: 6px 14px;
+  border-radius: 20px;
+  box-shadow: 0 1px 6px rgba(13,44,84,0.12);
+  user-select: none;
+}
+.runnable-toggle input { accent-color: var(--medium-bar); width: 16px; height: 16px; cursor: pointer; }
+
+.rain-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: var(--navy);
+  background: white;
+  padding: 6px 14px;
+  border-radius: 20px;
+  box-shadow: 0 1px 6px rgba(13,44,84,0.12);
+}
+
+/* ── TRIP MODAL ── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8,29,56,0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+}
+.modal-box {
+  background: white;
+  border-radius: 14px;
+  max-width: 380px;
+  width: 100%;
+  padding: 22px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+  position: relative;
+}
+.modal-box h3 {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 1.3rem;
+  color: var(--navy);
+  letter-spacing: 0.03em;
+  margin-bottom: 2px;
+}
+.modal-box .modal-trip {
+  color: var(--subtext);
+  font-size: 0.9rem;
+  margin-bottom: 14px;
+}
+.modal-box .modal-row {
+  font-size: 0.88rem;
+  margin: 8px 0;
+}
+.modal-box .modal-row b { color: var(--navy); }
+.modal-box a.maps-link {
+  display: block;
+  text-align: center;
+  margin-top: 14px;
+  background: var(--navy-mid);
+  color: white;
+  text-decoration: none;
+  padding: 9px 18px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+.modal-close {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  background: none;
+  border: none;
+  font-size: 1.4rem;
+  color: var(--subtext);
+  cursor: pointer;
+  line-height: 1;
+}
+tbody tr { cursor: pointer; }
+
+/* ── MOBILE TRIP CARDS ── */
+.card-list { display: none; padding: 10px 12px 14px; }
+
+.trip-card {
+  background: white;
+  border-radius: 10px;
+  padding: 12px 14px 12px 16px;
+  margin-bottom: 10px;
+  border-left: 5px solid var(--nodata-bar);
+  box-shadow: 0 1px 6px rgba(13,44,84,0.1);
+  cursor: pointer;
+}
+.trip-card.cond-below  { border-left-color: var(--below-bar);  background: var(--below-bg); }
+.trip-card.cond-low    { border-left-color: var(--low-bar);    background: var(--low-bg); }
+.trip-card.cond-medium { border-left-color: var(--medium-bar); background: var(--medium-bg); }
+.trip-card.cond-high   { border-left-color: var(--high-bar);   background: var(--high-bg); }
+.trip-card.cond-above  { border-left-color: var(--above-bar);  background: var(--above-bg); }
+
+.trip-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+.trip-card-name { font-weight: 600; color: var(--navy); font-size: 0.95rem; }
+.trip-card-trip { font-size: 0.82rem; color: var(--subtext); margin-top: 1px; }
+.trip-card-stats {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 9px;
+  font-size: 0.8rem;
+  color: var(--text);
+  flex-wrap: wrap;
+}
+.trip-card-stats b { font-variant-numeric: tabular-nums; }
+.trip-card-stats .stat-label { color: var(--subtext); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.card-empty { text-align: center; color: var(--subtext); font-style: italic; padding: 16px; font-size: 0.88rem; }
+
+@media (max-width: 640px) {
+  .table-wrap { display: none; }
+  .card-list { display: block; }
+}
+.cond-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.badge-below  { background: var(--below-bar);  color: white; }
+.badge-low    { background: var(--low-bar);    color: white; }
+.badge-medium { background: var(--medium-bar); color: white; }
+.badge-high   { background: var(--high-bar);   color: #333; }
+.badge-above  { background: var(--above-bar);  color: white; }
+.badge-nodata { background: var(--nodata-bar); color: white; }
+
+.thresholds {
+  font-size: 0.72rem;
+  color: var(--subtext);
+  white-space: nowrap;
+}
+.usgs-link a {
+  color: var(--navy-mid);
+  text-decoration: none;
+  font-size: 0.78rem;
+}
+.usgs-link a:hover { text-decoration: underline; }
+.notes-cell {
+  font-size: 0.78rem;
+  color: var(--subtext);
+  font-style: italic;
+  max-width: 200px;
+}
+
+/* ── MAP ── */
+#map { height: 480px; }
+.map-legend {
+  padding: 12px 20px;
+  display: flex;
+  gap: 20px;
+  font-size: 0.8rem;
+  color: var(--subtext);
+  border-top: 1px solid #eee;
+  background: #f9fafc;
+}
+.map-legend-item { display: flex; align-items: center; gap: 6px; }
+.map-dot { width: 12px; height: 12px; border-radius: 50%; }
+.dot-start { background: #2ecc71; border: 2px solid #1a9956; }
+.dot-end   { background: #e74c3c; border: 2px solid #b03020; }
+
+.hidden { display: none; }
+
+/* ── LOADING ── */
+.loading-row td {
+  text-align: center;
+  padding: 20px;
+  color: var(--subtext);
+  font-style: italic;
+  font-size: 0.88rem;
+}
+</style>
+</head>
+
+<body>
+
+<div class="sticky-top">
+<header>
+  <h1>North Shore Paddling <span style="font-size:0.6em;opacity:0.55;font-weight:400">v44</span></h1>
+</header>
+
+<div class="container" style="padding-top:10px;padding-bottom:2px">
+  <div class="meta-bar">
+    <div class="rain-badge" id="rainBadge" style="display:none"></div>
+    <button type="button" id="filtersToggle" onclick="toggleFilterGroup(event)">Filters ▾</button>
+    <div class="filters" id="filterGroup">
+      <select id="fltDrive" onchange="applyFilters()">
+        <option value="">Drive: Any</option>
+        <option value="15">Drive ≤15 min</option>
+        <option value="30">Drive ≤30 min</option>
+        <option value="45">Drive ≤45 min</option>
+      </select>
+      <select id="fltHours" onchange="applyFilters()">
+        <option value="">Hours: Any</option>
+        <option value="1">Hours ≤1</option>
+        <option value="2">Hours ≤2</option>
+        <option value="3">Hours ≤3</option>
+        <option value="4">Hours ≤4</option>
+      </select>
+      <div class="cond-filter" data-label="Rapids">
+        <button type="button" id="rapidsBtn" onclick="togglePanel(event,'rapidsPanel')">Rapids: Any ▾</button>
+        <div class="cond-panel" id="rapidsPanel">
+          <label><input type="checkbox" value="Flatwater" onchange="applyFilters()"> Flatwater</label>
+          <label><input type="checkbox" value="Riffles" onchange="applyFilters()"> Riffles</label>
+          <label><input type="checkbox" value="I" onchange="applyFilters()"> Class I</label>
+          <label><input type="checkbox" value="II" onchange="applyFilters()"> Class II</label>
+          <label><input type="checkbox" value="III" onchange="applyFilters()"> Class III</label>
+          <label><input type="checkbox" value="IV" onchange="applyFilters()"> Class IV</label>
+          <label><input type="checkbox" value="V" onchange="applyFilters()"> Class V</label>
+        </div>
+      </div>
+      <select id="fltStars" onchange="applyFilters()">
+        <option value="">Stars: Any</option>
+        <option value="5">5 stars</option>
+        <option value="4">4+ stars</option>
+        <option value="3">3+ stars</option>
+      </select>
+      <div class="cond-filter" data-label="Condition">
+        <button type="button" id="condBtn" onclick="togglePanel(event,'condPanel')">Condition: Any ▾</button>
+        <div class="cond-panel" id="condPanel">
+          <label><input type="checkbox" value="below"  onchange="applyFilters()"> Below</label>
+          <label><input type="checkbox" value="low"    onchange="applyFilters()"> Low</label>
+          <label><input type="checkbox" value="medium" onchange="applyFilters()"> Medium</label>
+          <label><input type="checkbox" value="high"   onchange="applyFilters()"> High</label>
+          <label><input type="checkbox" value="above"  onchange="applyFilters()"> Above</label>
+          <label><input type="checkbox" value="nodata" onchange="applyFilters()"> N/A</label>
+        </div>
+      </div>
+    </div>
+    <div class="legend">
+      <span class="legend-item"><span class="legend-dot" style="background:var(--below-bar)"></span>Below</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--low-bar)"></span>Low</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--medium-bar)"></span>Medium</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--high-bar)"></span>High</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--above-bar)"></span>Above</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--nodata-bar)"></span>No Data</span>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="container">
+  <div id="sectionsContainer"></div>
+
+  <div class="card">
+    <div class="card-header">
+      <h2>Trip Map</h2>
+      <button class="toggle-btn" onclick="toggleMap()">Hide</button>
+    </div>
+    <div id="map"></div>
+  </div>
+
+  <div class="updated" id="updatedTime" style="text-align:center;width:100%;margin:4px 0 24px">Fetching live USGS data…</div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+// ─── TRIP DATA (from Excel) ───────────────────────────────────────────────
+const TRIPS = [{"river":"Whitnall Park Creek","trip":"116th St to S 92nd St","type":"Whitewater","inName":"116th St","outName":"S 92nd St","hours":1.0,"hoursEst":true,"miles":2.2,"drive":34,"stars":null,"rapids":"I-II(IV)","usgs":"040871475","startCoord":[42.93887,-88.06378],"endCoord":[42.93094490727697,-88.028404712677],"below":70,"low":100,"medium":200,"high":300,"above":"301+","notes":"\"All ranges are highly speculative\"","gaugeName":"Wilson Park Creek @ Gmia Outfall 7 @ Milwaukee,wi - USGS-040871475","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-040871475/#period=P7D&dataTypeId=continuous-00060-0&showMedian=true&showFieldMeasurements=true","tripLink":"https://www.americanwhitewater.org/content/River/view/river-detail/11701/main"},{"river":"Menomonee River","trip":"A) Main St to Arthur Ave","type":"Whitewater","inName":"Main St","outName":"Arthur Ave","hours":0.5,"hoursEst":true,"miles":0.41,"drive":15,"stars":null,"rapids":"II-III","usgs":"04087030","startCoord":[43.17935156244329,-88.11443388462067],"endCoord":[43.17516577629283,-88.10897290706635],"below":120,"low":240,"medium":360,"high":550,"above":"551+","notes":null,"gaugeName":"Menomonee River at Menomonee Falls, WI - USGS-04087030","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-04087030/#dataTypeId=continuous-00065-0&period=P7D&showFieldMeasurements=true","tripLink":"https://www.americanwhitewater.org/content/River/view/river-detail/2653/main"},{"river":"Milwaukee River","trip":"A) West Bend","type":"Whitewater","inName":"E Washington St Dam","outName":"S River Rd","hours":1.0,"hoursEst":true,"miles":2,"drive":28,"stars":null,"rapids":"I(II)","usgs":"04086600","startCoord":[43.42749971528423,-88.18339884281158],"endCoord":[43.42562576762933,-88.16196799278259],"below":520,"low":780,"medium":1300,"high":2600,"above":"2601+","notes":null,"gaugeName":"Milwaukee River Near Cedarburg, WI - USGS-04086600","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-04086600/#dataTypeId=continuous-00065-0&period=P7D&showFieldMeasurements=true","tripLink":"https://www.americanwhitewater.org/content/River/view/river-detail/11149/main"},{"river":"Milwaukee River","trip":"B) Grafton Dells","type":"Whitewater","inName":"Bridge St","outName":"Lime Kiln Park","hours":0.5,"hoursEst":true,"miles":1.2,"drive":16,"stars":null,"rapids":"I-II(III)","usgs":"04086600","startCoord":[43.31800063168828,-87.94899523258209],"endCoord":[43.3029998540527,-87.95699894428253],"below":390,"low":775,"medium":1300,"high":3900,"above":"3911+","notes":null,"gaugeName":"Milwaukee River Near Cedarburg, WI - USGS-04086600","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-04086600/#dataTypeId=continuous-00065-0&period=P7D&showFieldMeasurements=true","tripLink":"https://www.americanwhitewater.org/content/River/view/river-detail/2889/main"},{"river":"Menomonee River","trip":"B) MenWesTosa","type":"Whitewater","inName":"Hartung Park","outName":"Hart Park","hours":1.5,"hoursEst":true,"miles":3.5,"drive":22,"stars":null,"rapids":"I-II","usgs":"04087120","startCoord":[43.082241880686155,-88.0409574508667],"endCoord":[43.04865122922661,-88.00768196582794],"below":140,"low":280,"medium":700,"high":1120,"above":"1121+","notes":null,"gaugeName":"Menomonee River at Wauwatosa, WI - USGS-04087120","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-04087120/#dataTypeId=continuous-00065-0&period=P7D&showFieldMeasurements=true","tripLink":"https://www.americanwhitewater.org/content/River/view/river-detail/11046/main"},{"river":"Fox River","trip":"Barstow St to Wisconsin Ave","type":"Whitewater","inName":"Barstow St","outName":"Wisconsin Ave","hours":0.5,"hoursEst":true,"miles":0.4,"drive":37,"stars":null,"rapids":"I","usgs":"05543830","startCoord":[43.013598739219475,-88.22939872741699],"endCoord":[43.01026067032055,-88.236785531044],"below":100,"low":250,"medium":400,"high":600,"above":"601+","notes":"\"We need your input about gauge ranges\"","gaugeName":"Fox River at Waukesha, WI - USGS-05543830\n","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-05543830/#period=P7D&dataTypeId=continuous-00060-0&showMedian=true&showFieldMeasurements=true","tripLink":"https://www.americanwhitewater.org/content/River/view/river-detail/4576/main"},{"river":"Pigeon Creek","trip":"Bonniwell Rd to Highland Rd","type":"Whitewater","inName":"Bonniwell Rd","outName":"Highland Rd","hours":1.0,"hoursEst":true,"miles":2.6,"drive":5,"stars":null,"rapids":"II","usgs":"04087030","startCoord":[43.265300069781034,-88.01419973373413],"endCoord":[43.25095833621725,-87.99080550670624],"below":200,"low":400,"medium":600,"high":800,"above":"801+","notes":null,"gaugeName":"Menomonee River at Menomonee Falls, WI - USGS-04087030","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-04087030/#dataTypeId=continuous-00065-0&period=P7D&showFieldMeasurements=true","tripLink":"https://www.americanwhitewater.org/content/River/view/river-detail/6541/main"},{"river":"Milwaukee River","trip":"Brown Deer","type":"Casual","inName":"Thiensville Village Park","outName":"Badger Meter River Park","hours":1.875,"hoursEst":false,"miles":4.5,"drive":null,"stars":null,"rapids":null,"usgs":null,"startCoord":[43.23094,-87.97965],"endCoord":[43.17775,-87.95637],"below":null,"low":175,"medium":null,"high":null,"above":null,"notes":"Duplicate - combine?","gaugeName":null,"usgsLink":null,"tripLink":"https://forwardoutdoor.com/river-kayaking/"},{"river":"Milwaukee River","trip":"C) Estabrook Park to N Riverboat Rd","type":"Whitewater","inName":"Estabrook Park","outName":"N Riverboat Rd","hours":1.5,"hoursEst":true,"miles":3.5,"drive":23,"stars":null,"rapids":"I-II(III)","usgs":"04087000","startCoord":[43.10085,-87.90955],"endCoord":[43.05700064220517,-87.89700329303741],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":"\"After destruction of Estabrook ledge, gauge must be recalibrated\"","gaugeName":"Milwaukee River at Milwaukee, WI - USGS-04087000","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-04087000/#dataTypeId=continuous-00065-1601345372&period=P7D&showFieldMeasurements=true","tripLink":"https://www.americanwhitewater.org/content/River/view/river-detail/3313/main"},{"river":"Menomonee River","trip":"C) Hart Park Ln to W Monarch Pl","type":"Whitewater","inName":"Hart Park","outName":"W Monarch Pl","hours":1.5,"hoursEst":true,"miles":3.7,"drive":28,"stars":null,"rapids":"II-III","usgs":"04087120","startCoord":[43.049737109205296,-88.01172137260437],"endCoord":[43.034995725977154,-87.96642422676086],"below":125,"low":1200,"medium":2500,"high":3850,"above":"3851+","notes":null,"gaugeName":"Menomonee River at Wauwatosa, WI - USGS-04087120","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-04087120/#dataTypeId=continuous-00065-0&period=P7D&showFieldMeasurements=true","tripLink":"https://www.americanwhitewater.org/content/River/view/river-detail/2654/main"},{"river":"Milwaukee River","trip":"Campbellsport","type":"Casual","inName":"Hwy W Bridge","outName":"Columbus Park","hours":2,"hoursEst":false,"miles":4.6,"drive":null,"stars":4,"rapids":"I(II)","usgs":null,"startCoord":[43.63166,-88.28013],"endCoord":[43.59468,-88.27033],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":null,"gaugeName":null,"usgsLink":null,"tripLink":"https://www.wisconsinrivertrips.com/segments/milwaukee-river/campbellsport"},{"river":"Cedar Creek","trip":"Cedarburg","type":"Casual","inName":"Estate Bridge","outName":"Garrison's Glen","hours":2.5,"hoursEst":false,"miles":5.2,"drive":null,"stars":5,"rapids":"I-II(III)","usgs":"04086500","startCoord":[43.30160459323437,-87.9668422979728],"endCoord":[43.28002961622038,-87.94196107744924],"below":45,"low":100,"medium":200,"high":400,"above":"600+","notes":null,"gaugeName":"Cedar Creek Near Cedarburg, WI - USGS-04086500","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-04086500/#dataTypeId=continuous-00065-0&period=P7D&showFieldMeasurements=true","tripLink":"https://www.wisconsinrivertrips.com/segments/cedar-creek-cedarburg"},{"river":"Cedar Creek","trip":"Cedarburg Mill to CTH T","type":"Whitewater","inName":"Cedarburg Mill","outName":"CTH T","hours":1.0,"hoursEst":true,"miles":2.3,"drive":10,"stars":null,"rapids":"II-III","usgs":"04086500","startCoord":[43.29688215899148,-87.98599362373352],"endCoord":[43.29395388036471,-87.97060310840607],"below":100,"low":300,"medium":600,"high":1200,"above":"1201+","notes":null,"gaugeName":"Cedar Creek Near Cedarburg, WI - USGS-04086500","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-04086500/#dataTypeId=continuous-00065-0&period=P7D&showFieldMeasurements=true","tripLink":"https://www.americanwhitewater.org/content/River/view/river-detail/2652/main"},{"river":"Sauk Creek","trip":"Conservancy to S Wisconsin St","type":"Whitewater","inName":"Conservancy","outName":"S Wisconsin St","hours":0.5,"hoursEst":true,"miles":1.2,"drive":23,"stars":null,"rapids":"II-III(IV)","usgs":"04087030","startCoord":[43.395537267147404,-87.88331866264343],"endCoord":[43.38656355105317,-87.87092685699463],"below":200,"low":350,"medium":500,"high":750,"above":"751+","notes":null,"gaugeName":"Menomonee River at Menomonee Falls, WI - USGS-04087030","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-04087030/#dataTypeId=continuous-00065-0&period=P7D&showFieldMeasurements=true","tripLink":"https://www.americanwhitewater.org/content/River/view/river-detail/2890/main"},{"river":"Cedar Creek","trip":"County Road M to Cedarburg","type":"Casual","inName":"County Rd M","outName":"Boy Scout Park","hours":3.5,"hoursEst":false,"miles":11.25,"drive":17,"stars":3,"rapids":"Riffles","usgs":"04086500","startCoord":[43.34453,-88.07797],"endCoord":[43.30186,-87.98826],"below":100,"low":150,"medium":250,"high":400,"above":"401+","notes":"\"Recommended minimum level\" \"minimum of 6ft\" ... CFS thresholds from Claude","gaugeName":"Cedar Creek Near Cedarburg, WI - USGS-04086500","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-04086500/#dataTypeId=continuous-00065-0&period=P7D&showFieldMeasurements=true","tripLink":"https://milespaddled.com/cedar-creek/"},{"river":"Cedar Creek","trip":"Covered Bridge Park to Lions Park","type":"Casual","inName":"Covered Bridge Park","outName":"Lions Park","hours":2.75,"hoursEst":false,"miles":3.6,"drive":null,"stars":4,"rapids":null,"usgs":null,"startCoord":[43.33823856913632,-88.0035969283305],"endCoord":[43.321042462805714,-87.97770523494336],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":null,"gaugeName":null,"usgsLink":null,"tripLink":"https://www.wisconsinrivertrips.com/segments/cedar-creek"},{"river":"Milwaukee River","trip":"Downtown","type":"Casual","inName":"Riverside Park","outName":"McKinley Park","hours":3.5,"hoursEst":false,"miles":6.3,"drive":30,"stars":5,"rapids":"Flatwater","usgs":"04087000","startCoord":[43.068,-87.89483],"endCoord":[43.05129,-87.88254],"below":100,"low":500,"medium":1000,"high":1500,"above":"1501+","notes":null,"gaugeName":"Milwaukee River at Milwaukee, WI - USGS-04087000","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-04087000/#dataTypeId=continuous-00065-1601345372&period=P7D&showFieldMeasurements=true","tripLink":"https://www.wisconsinrivertrips.com/segments/milwaukee-river/downtown"},{"river":"Milwaukee River","trip":"Fredonia","type":"Casual","inName":"Waubedonia Park","outName":"Ehlers Park","hours":2,"hoursEst":false,"miles":5.5,"drive":null,"stars":4,"rapids":"Riffles","usgs":null,"startCoord":[43.46841,-87.97309],"endCoord":[43.40992,-87.94124],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":"Duplicate - combine?","gaugeName":null,"usgsLink":null,"tripLink":"https://www.wisconsinrivertrips.com/segments/milwaukee-river/fredonia"},{"river":"Menomonee River","trip":"From Hoyt Park","type":"Casual","inName":"Hoyt Park","outName":"Blue Mound Rd","hours":2,"hoursEst":false,"miles":3.9,"drive":null,"stars":5,"rapids":"I-II(III)","usgs":"04087120","startCoord":[43.055758359108154,-88.02466414468958],"endCoord":[43.03906610298447,-87.96552006488534],"below":60,"low":100,"medium":250,"high":400,"above":"600+","notes":null,"gaugeName":"Menomonee River at Wauwatosa, WI - USGS-04087120","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-04087120/#dataTypeId=continuous-00065-0&period=P7D&showFieldMeasurements=true","tripLink":"https://www.wisconsinrivertrips.com/segments/menomonee-river/hoyt-park"},{"river":"Fox River","trip":"From Poplar Creek","type":"Casual","inName":"Wray Park","outName":"Grede Park","hours":3,"hoursEst":false,"miles":6.51,"drive":null,"stars":3.5,"rapids":"I-II","usgs":null,"startCoord":[43.051188965337644,-88.17160191217647],"endCoord":[43.00807517087219,-88.2397527421562],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":null,"gaugeName":null,"usgsLink":null,"tripLink":"https://www.wisconsinrivertrips.com/segments/illinois-fox-river/poplar-creek"},{"river":"Milwaukee River","trip":"From Quass Creek Park","type":"Casual","inName":"Quaas Creek Park","outName":"Goeden Park","hours":3.5,"hoursEst":false,"miles":6.3,"drive":null,"stars":3.5,"rapids":"I","usgs":null,"startCoord":[43.41955,-88.14572],"endCoord":[43.4249,-88.07988],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":null,"gaugeName":null,"usgsLink":null,"tripLink":"https://www.wisconsinrivertrips.com/segments/milwaukee-river/quaas-creek"},{"river":"Milwaukee River","trip":"Garrison's Glen to Thiensville Village Park","type":"Casual","inName":"Garrison's Glen","outName":"Thiensville Village Park","hours":2.75,"hoursEst":false,"miles":6.5,"drive":null,"stars":null,"rapids":null,"usgs":null,"startCoord":[43.27982,-87.94188],"endCoord":[43.23095,-87.97864],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":"Overlaps - combine?","gaugeName":null,"usgsLink":null,"tripLink":"https://forwardoutdoor.com/river-kayaking/"},{"river":"Bark River","trip":"Hartland","type":"Casual","inName":"Bark River Park","outName":"Delafield Post Office","hours":3,"hoursEst":false,"miles":6.2,"drive":40,"stars":4.5,"rapids":"I(II)","usgs":"05426067","startCoord":[43.10929902983364,-88.34369861446653],"endCoord":[43.06282483730416,-88.40437336427945],"below":30,"low":45,"medium":60,"high":80,"above":"81+","notes":null,"gaugeName":"Bark River at Nagawicka Road at Delafield, WI - USGS-05426067","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-05426067/#dataTypeId=continuous-00065-0&period=P7D&showFieldMeasurements=true","tripLink":"https://www.wisconsinrivertrips.com/segments/bark-river/hartland"},{"river":"Mole Creek","trip":"Heritage Ct to OIT Bridge","type":"Whitewater","inName":"Heritage Ct","outName":"OIT Bridge","hours":0.5,"hoursEst":true,"miles":1,"drive":17,"stars":null,"rapids":"I-II","usgs":"04087030","startCoord":[43.33947,-87.96037],"endCoord":[43.33424,-87.94669],"below":250,"low":350,"medium":725,"high":1080,"above":"1081+","notes":null,"gaugeName":"Menomonee River at Menomonee Falls, WI - USGS-04087030","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-04087030/#dataTypeId=continuous-00065-0&period=P7D&showFieldMeasurements=true","tripLink":"https://www.americanwhitewater.org/content/River/view/river-detail/11422/main"},{"river":"Milwaukee River - E. Branch","trip":"Highway SS to Mill Road","type":"Casual","inName":"Hwy SS Bridge","outName":"Mill Rd Bridge","hours":3.5,"hoursEst":false,"miles":6.9,"drive":null,"stars":4,"rapids":"I","usgs":null,"startCoord":[43.615847126689815,-88.18157695307532],"endCoord":[43.556006185426234,-88.1893410357602],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":null,"gaugeName":null,"usgsLink":null,"tripLink":"https://www.wisconsinrivertrips.com/segments/milwaukee-river-east-branch"},{"river":"Rubicon River","trip":"Hilldale Drive to West Side Park","type":"Casual","inName":"Hilldale Dr","outName":"West Side Park","hours":1.5,"hoursEst":false,"miles":3,"drive":32,"stars":4.5,"rapids":"I(II)","usgs":"05426067","startCoord":[43.32576623909596,-88.34693528533451],"endCoord":[43.31987739447249,-88.38760929530409],"below":50,"low":65,"medium":80,"high":95,"above":"96+","notes":null,"gaugeName":"Bark River at Nagawicka Road at Delafield, WI - USGS-05426067","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-05426067/#dataTypeId=continuous-00065-0&period=P7D&showFieldMeasurements=true","tripLink":"https://www.wisconsinrivertrips.com/segments/rubicon-river/hartford"},{"river":"Honey Creek","trip":"Honey Creek Pkwy to Menomonee River","type":"Whitewater","inName":"Honey Creek Pkwy","outName":"Menomonee River","hours":0.5,"hoursEst":true,"miles":1.8,"drive":25,"stars":null,"rapids":"II-III+","usgs":"04087119","startCoord":[43.02960012171593,-88.01680147647858],"endCoord":[43.04467,-88.00234],"below":75,"low":250,"medium":500,"high":600,"above":"601+","notes":null,"gaugeName":"Honey Creek at Wauwatosa, WI - USGS-04087119","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-04087119/#period=P7D&dataTypeId=continuous-00060-0&showMedian=true&showFieldMeasurements=true","tripLink":"https://www.americanwhitewater.org/content/River/view/river-detail/2940/main"},{"river":"Onion River","trip":"I - County Road V to Sheboygan Falls","type":"Casual","inName":"County Rd V","outName":"Rochester Park","hours":2,"hoursEst":false,"miles":7.25,"drive":null,"stars":4,"rapids":"I","usgs":"04086000","startCoord":[43.67401,-87.81599],"endCoord":[43.72355,-87.8046],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":"\"We recommend this level \u2013 they were ideal.\"","gaugeName":"Sheboygan River at Sheboygan, WI - USGS-04086000","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-04086000/#dataTypeId=continuous-00065-0&period=P7D&showFieldMeasurements=true","tripLink":"https://milespaddled.com/onion-river-i/"},{"river":"Menomonee River","trip":"I - Frontier Park to Jacobus Park","type":"Casual","inName":"Frontier Park","outName":"Jacobus Park","hours":3,"hoursEst":false,"miles":8.25,"drive":19,"stars":4,"rapids":"I(II)","usgs":"04087120","startCoord":[43.11344,-88.06993],"endCoord":[43.04257,-87.99237],"below":250,"low":350,"medium":600,"high":800,"above":"801+","notes":"\"strongly recommend this level\" ... CFS thresholds from Claude","gaugeName":"Menomonee River at Wauwatosa, WI - USGS-04087120","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-04087120/#dataTypeId=continuous-00065-0&period=P7D&showFieldMeasurements=true","tripLink":"https://milespaddled.com/menomonee-river-i/"},{"river":"Milwaukee River - E. Branch","trip":"I - New Prospect to New Fane","type":"Casual","inName":"County Rd SS","outName":"County Rd S","hours":3.333333333,"hoursEst":false,"miles":7.5,"drive":43,"stars":4,"rapids":"I","usgs":null,"startCoord":[43.61584,-88.18151],"endCoord":[43.55018,-88.18856],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":"X - gauge discontinued","gaugeName":null,"usgsLink":null,"tripLink":"https://milespaddled.com/milwaukee-river-east-branch-i/"},{"river":"Milwaukee River","trip":"I - Newburg to Fredonia","type":"Casual","inName":"Fireman's Park","outName":"Waubedonia Park","hours":4,"hoursEst":false,"miles":11,"drive":23,"stars":3,"rapids":"Riffles","usgs":"04086600","startCoord":[43.43373,-88.04926],"endCoord":[43.46838,-87.97313],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":"\"Recommended minimum level\"","gaugeName":"Milwaukee River Near Cedarburg, WI - USGS-04086600","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-04086600/#dataTypeId=continuous-00065-0&period=P7D&showFieldMeasurements=true","tripLink":"https://milespaddled.com/milwaukee-river-i/"},{"river":"Onion River","trip":"II - County Road A to County Road V","type":"Casual","inName":"County Rd A","outName":"County Rd V","hours":1.333333333,"hoursEst":false,"miles":5.25,"drive":39,"stars":2,"rapids":"Riffles","usgs":"04086000","startCoord":[43.62322,-87.83704],"endCoord":[43.67404,-87.816],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":"\"lowest recommended level. Doable, but barely.\"","gaugeName":"Sheboygan River at Sheboygan, WI - USGS-04086000","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-04086000/#dataTypeId=continuous-00065-0&period=P7D&showFieldMeasurements=true","tripLink":"https://milespaddled.com/onion-river-ii/"},{"river":"Milwaukee River","trip":"II - Estabrook Park to Bruce Street","type":"Casual","inName":"Estabrook Park","outName":"Bruce St Boat Launch","hours":2.5,"hoursEst":false,"miles":6.25,"drive":26,"stars":5,"rapids":"I-II","usgs":"04087000","startCoord":[43.09944,-87.90763],"endCoord":[43.02503,-87.90403],"below":null,"low":200,"medium":900,"high":null,"above":null,"notes":null,"gaugeName":"Milwaukee River at Milwaukee, WI - USGS-04087000","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-04087000/#dataTypeId=continuous-00065-1601345372&period=P7D&showFieldMeasurements=true","tripLink":"https://milespaddled.com/milwaukee-river-ii/"},{"river":"Bark River","trip":"II - Merton to Highway 83","type":"Casual","inName":"Merton Dam","outName":"Hwy 83","hours":3.25,"hoursEst":false,"miles":7.25,"drive":31,"stars":3,"rapids":"I","usgs":"05426067","startCoord":[43.1488,-88.30731],"endCoord":[43.08662,-88.36324],"below":50,"low":null,"medium":null,"high":null,"above":null,"notes":"\"This is the recommended minimum level\"","gaugeName":"Bark River at Nagawicka Road at Delafield, WI - USGS-05426067","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-05426067/#dataTypeId=continuous-00065-0&period=P7D&showFieldMeasurements=true","tripLink":"https://milespaddled.com/bark-river-ii/"},{"river":"Milwaukee River - E. Branch","trip":"II - New Fane to Kewaskum","type":"Casual","inName":"County Rd S","outName":"Oak Dr","hours":5,"hoursEst":false,"miles":6.5,"drive":37,"stars":4,"rapids":"Riffles","usgs":null,"startCoord":[43.55023,-88.18858],"endCoord":[43.4984,-88.19467],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":"X - gauge discontinued","gaugeName":null,"usgsLink":null,"tripLink":"https://milespaddled.com/milwaukee-river-east-branch-ii/"},{"river":"Menomonee River","trip":"II - Pilgrim Road to Frontier Park","type":"Casual","inName":"Pilgrim Rd","outName":"Frontier Park","hours":3,"hoursEst":false,"miles":7.5,"drive":17,"stars":2,"rapids":"I","usgs":"04087030","startCoord":[43.17297,-88.10349],"endCoord":[43.11343,-88.06992],"below":150,"low":250,"medium":400,"high":550,"above":"551+","notes":"\"Recommended minimum level\" ... CFS thresholds from Claude","gaugeName":"Menomonee River at Menomonee Falls, WI - USGS-04087030","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-04087030/#dataTypeId=continuous-00065-0&period=P7D&showFieldMeasurements=true","tripLink":"https://milespaddled.com/menomonee-river-ii/"},{"river":"Oconomowoc River","trip":"II - Wisconsin Avenue to Fowler Lake Park","type":"Casual","inName":"Wisconsin Ave Boat Launch","outName":"Fowler Lake Park","hours":1.75,"hoursEst":false,"miles":3.75,"drive":null,"stars":3,"rapids":"Flatwater","usgs":null,"startCoord":[43.10863,-88.45403],"endCoord":[43.11456,-88.49315],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":null,"gaugeName":null,"usgsLink":null,"tripLink":"https://milespaddled.com/oconomowoc-river-ii/"},{"river":"Milwaukee River - E. Branch","trip":"III - Dundee to Mauthe Lake","type":"Casual","inName":"Dundee Dam","outName":"Mauthe Lake","hours":3,"hoursEst":false,"miles":6.75,"drive":45,"stars":3,"rapids":"Riffles","usgs":null,"startCoord":[43.64913,-88.1774],"endCoord":[43.5996,-88.18075],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":null,"gaugeName":null,"usgsLink":null,"tripLink":"https://milespaddled.com/milwaukee-river-east-branch-iii/"},{"river":"Bark River","trip":"III - Highway 83 to Delafield Road","type":"Casual","inName":"Hwy 83","outName":"Upper Nemahbin Lake","hours":2.166666667,"hoursEst":false,"miles":5.75,"drive":null,"stars":4,"rapids":"I-II","usgs":"05426067","startCoord":[43.0866,-88.36327],"endCoord":[43.05873,-88.43185],"below":50,"low":60,"medium":null,"high":null,"above":null,"notes":"...","gaugeName":"Bark River at Nagawicka Road at Delafield, WI - USGS-05426067","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-05426067/#dataTypeId=continuous-00065-0&period=P7D&showFieldMeasurements=true","tripLink":"https://milespaddled.com/bark-river-iii/"},{"river":"Milwaukee River","trip":"III - Lime Kiln Park to Thiensville","type":"Casual","inName":"Lime Kiln Park","outName":"Villa Grove Park","hours":2.5,"hoursEst":false,"miles":8.75,"drive":13,"stars":3,"rapids":"I","usgs":"04086600","startCoord":[43.30534,-87.95358],"endCoord":[43.23439,-87.95722],"below":200,"low":300,"medium":600,"high":900,"above":"901+","notes":"\"We recommend this level\" ... CFS thresholds from Claude","gaugeName":"Milwaukee River Near Cedarburg, WI - USGS-04086600","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-04086600/#dataTypeId=continuous-00065-0&period=P7D&showFieldMeasurements=true","tripLink":"https://milespaddled.com/milwaukee-river-iii/"},{"river":"Oconomowoc River","trip":"III - Monches to Okauchee Lake","type":"Casual","inName":"Monches Dam","outName":"Hollywood's Roadhouse Bar","hours":2.5,"hoursEst":false,"miles":7,"drive":null,"stars":4,"rapids":"I","usgs":null,"startCoord":[43.18915,-88.34198],"endCoord":[43.13873,-88.40697],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":"Overlaps - combine?","gaugeName":null,"usgsLink":null,"tripLink":"https://milespaddled.com/oconomowoc-river-iii/"},{"river":"Bark River","trip":"IV - Highway 164 to Merton","type":"Casual","inName":"Hwy 164","outName":"Merton Millpond","hours":1.833333333,"hoursEst":false,"miles":4,"drive":25,"stars":2,"rapids":"Riffles","usgs":"05426067","startCoord":[43.17969,-88.26254],"endCoord":[43.14871,-88.30684],"below":null,"low":55,"medium":null,"high":null,"above":null,"notes":null,"gaugeName":"Bark River at Nagawicka Road at Delafield, WI - USGS-05426067","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-05426067/#dataTypeId=continuous-00065-0&period=P7D&showFieldMeasurements=true","tripLink":"https://milespaddled.com/bark-river-iv/"},{"river":"Milwaukee River","trip":"IV - Kewaskum to Barton","type":"Casual","inName":"Parkview Dr Dam","outName":"Commerce St Dam","hours":2,"hoursEst":false,"miles":8.5,"drive":34,"stars":3,"rapids":"Riffles","usgs":"04086600","startCoord":[43.51734,-88.22324],"endCoord":[43.44255,-88.18135],"below":350,"low":500,"medium":700,"high":1000,"above":"1001+","notes":"\"We recommend these levels\" ... CFS thresholds from Claude","gaugeName":"Milwaukee River Near Cedarburg, WI - USGS-04086600","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-04086600/#dataTypeId=continuous-00065-0&period=P7D&showFieldMeasurements=true","tripLink":"https://milespaddled.com/milwaukee-river-iv/"},{"river":"Oconomowoc River","trip":"IV - Loew Lake","type":"Casual","inName":"Loew Lake Boat Launch","outName":"Loew Lake Boat Launch","hours":2.5,"hoursEst":false,"miles":7,"drive":null,"stars":3,"rapids":"Flatwater","usgs":null,"startCoord":[43.19305,-88.33828],"endCoord":[43.19305,-88.33828],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":null,"gaugeName":null,"usgsLink":null,"tripLink":"https://milespaddled.com/oconomowoc-river-iv/"},{"river":"Pewaukee River","trip":"Koepp Village Park to Frame Park","type":"Whitewater","inName":"Koepp Village Park","outName":"Frame Park","hours":3.5,"hoursEst":true,"miles":8.2,"drive":34,"stars":null,"rapids":"I-II","usgs":"05543830","startCoord":[43.08349,-88.26159],"endCoord":[43.01762,-88.22298],"below":100,"low":200,"medium":500,"high":800,"above":"801+","notes":null,"gaugeName":"Fox River at Waukesha, WI - USGS-05543830\n","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-05543830/#period=P7D&dataTypeId=continuous-00060-0&showMedian=true&showFieldMeasurements=true","tripLink":"https://www.americanwhitewater.org/content/River/view/river-detail/2939/main"},{"river":"Underwood Creek","trip":"Kreuger Park to Hoyt Park","type":"Whitewater","inName":"Kreuger Park","outName":"Hoyt Park","hours":1.5,"hoursEst":true,"miles":3.6,"drive":28,"stars":null,"rapids":"II(III)","usgs":"04087088","startCoord":[43.03139609498811,-88.06849837303162],"endCoord":[43.05264,-88.02309],"below":125,"low":325,"medium":450,"high":870,"above":"871+","notes":null,"gaugeName":"Underwood Creek at Wauwatosa, WI - USGS-04087088","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-04087088/#period=P7D&dataTypeId=continuous-00060-0&showMedian=true&showFieldMeasurements=true","tripLink":"https://www.americanwhitewater.org/content/River/view/river-detail/10405/main"},{"river":"Oconomowoc River","trip":"Loew Lake: St Augustine Rd to County Line Rd","type":"Casual","inName":"St Augustine Rd","outName":"County Line Rd","hours":2,"hoursEst":false,"miles":4.4,"drive":null,"stars":3,"rapids":"I","usgs":null,"startCoord":[43.219285090142805,-88.3007071170847],"endCoord":[43.19300320789887,-88.33836703330732],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":null,"gaugeName":null,"usgsLink":null,"tripLink":"https://www.wisconsinrivertrips.com/segments/oconomowoc-river/loew-lake"},{"river":"Milwaukee River","trip":"M-10","type":"Casual","inName":"Grafton Canoe Launch","outName":"Veterans Memorial Park","hours":null,"hoursEst":false,"miles":null,"drive":null,"stars":null,"rapids":"I+","usgs":null,"startCoord":[43.36306,-87.94305],"endCoord":[43.32185,-87.94954],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":null,"gaugeName":null,"usgsLink":null,"tripLink":"https://treasuresofoz.org/catalog/item/13-canoeing-kayaking-routes/41-route-m-10-milwaukee-river-saukville-to-grafton"},{"river":"Milwaukee River","trip":"M-11","type":"Casual","inName":"Lime Kiln Park","outName":"Garrison's Glen","hours":null,"hoursEst":false,"miles":null,"drive":null,"stars":null,"rapids":"I","usgs":null,"startCoord":[43.30519,-87.95362],"endCoord":[43.27982,-87.94188],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":"Overlaps - combine?","gaugeName":null,"usgsLink":null,"tripLink":"https://treasuresofoz.org/catalog/item/13-canoeing-kayaking-routes/42-route-m-11-milwaukee-river-grafton-to-mequon"},{"river":"Milwaukee River","trip":"M-12a","type":"Casual","inName":"Garrison's Glen","outName":"Moonlight Landing","hours":1.5,"hoursEst":false,"miles":null,"drive":null,"stars":null,"rapids":"I","usgs":null,"startCoord":[43.27982,-87.94188],"endCoord":[43.24449,-87.93357],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":"Overlaps - combine?","gaugeName":null,"usgsLink":null,"tripLink":"https://treasuresofoz.org/catalog/item/13-canoeing-kayaking-routes/45-route-m-12-milwaukee-river-mequon-to-thiensville"},{"river":"Milwaukee River","trip":"M-12b","type":"Casual","inName":"Moonlight Landing","outName":"Villa Grove Park","hours":1,"hoursEst":false,"miles":null,"drive":null,"stars":null,"rapids":"Flatwater","usgs":null,"startCoord":[43.24449,-87.93357],"endCoord":[43.23436,-87.95718],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":null,"gaugeName":null,"usgsLink":null,"tripLink":"https://treasuresofoz.org/catalog/item/13-canoeing-kayaking-routes/45-route-m-12-milwaukee-river-mequon-to-thiensville"},{"river":"Milwaukee River","trip":"M-12c","type":"Casual","inName":"Villa Grove Park","outName":"Thiensville Village Park","hours":0.5,"hoursEst":false,"miles":null,"drive":null,"stars":null,"rapids":"Flatwater","usgs":null,"startCoord":[43.23436,-87.95718],"endCoord":[43.23095,-87.97864],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":null,"gaugeName":null,"usgsLink":null,"tripLink":"https://treasuresofoz.org/catalog/item/13-canoeing-kayaking-routes/45-route-m-12-milwaukee-river-mequon-to-thiensville"},{"river":"Milwaukee River","trip":"M-13","type":"Casual","inName":"Thiensville Village Park","outName":"Badger Meter River Park","hours":null,"hoursEst":false,"miles":null,"drive":null,"stars":null,"rapids":"I","usgs":null,"startCoord":[43.23095,-87.97864],"endCoord":[43.17775,-87.95637],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":"Duplicate - combine?","gaugeName":null,"usgsLink":null,"tripLink":"https://treasuresofoz.org/catalog/item/13-canoeing-kayaking-routes/43-route-m-13-milwaukee-river-thiensville-to-brown-deer"},{"river":"Milwaukee River","trip":"M-6","type":"Casual","inName":"Falkner Park","outName":"Hwy A Bridge","hours":3,"hoursEst":false,"miles":5.5,"drive":null,"stars":null,"rapids":"Riffles","usgs":null,"startCoord":[43.43407,-88.04808],"endCoord":[43.46889,-88.05341],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":"Duplicate - combine?","gaugeName":null,"usgsLink":null,"tripLink":"https://treasuresofoz.org/catalog/item/13-canoeing-kayaking-routes/105-route-m-6-milwaukee-river-newburg-to-hwy-a"},{"river":"Milwaukee River","trip":"M-8","type":"Casual","inName":"Waubedonia Park","outName":"Ehlers Park","hours":2.5,"hoursEst":false,"miles":5,"drive":null,"stars":null,"rapids":"I+(II)","usgs":null,"startCoord":[43.46841,-87.97309],"endCoord":[43.40992,-87.94124],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":"Duplicate - combine?","gaugeName":null,"usgsLink":null,"tripLink":"https://treasuresofoz.org/catalog/item/13-canoeing-kayaking-routes/40-route-m-8-milwaukee-river-fredonia-to-saukville"},{"river":"Milwaukee River","trip":"M-9","type":"Casual","inName":"Ehlers Park","outName":"Grafton Canoe Launch","hours":2.5,"hoursEst":false,"miles":4.5,"drive":null,"stars":null,"rapids":"I+","usgs":null,"startCoord":[43.40992,-87.94124],"endCoord":[43.36306,-87.94305],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":null,"gaugeName":null,"usgsLink":null,"tripLink":"https://treasuresofoz.org/catalog/item/13-canoeing-kayaking-routes/44-route-m-9-milwaukee-river-saukville-to-town-of-grafton"},{"river":"Milwaukee River","trip":"Mequon","type":"Casual","inName":"Garrison's Glen","outName":"Villa Grove Park","hours":2.5,"hoursEst":false,"miles":5.5,"drive":null,"stars":null,"rapids":null,"usgs":null,"startCoord":[43.27982,-87.94188],"endCoord":[43.23436,-87.95718],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":"Overlaps - combine?","gaugeName":null,"usgsLink":null,"tripLink":"https://forwardoutdoor.com/river-kayaking/"},{"river":"Bark River","trip":"Merton","type":"Casual","inName":"Merton Dam","outName":"Bark River Park","hours":2.5,"hoursEst":false,"miles":4.9,"drive":null,"stars":4,"rapids":"I","usgs":null,"startCoord":[43.14852244528727,-88.30752025693018],"endCoord":[43.10929599525126,-88.34365915746272],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":"Overlaps - combine?","gaugeName":null,"usgsLink":null,"tripLink":"https://www.wisconsinrivertrips.com/segments/bark-river/merton"},{"river":"Oconomowoc River","trip":"Monches to West Shore Dr","type":"Casual","inName":"Monches Dam","outName":"West Shore Dr","hours":3,"hoursEst":false,"miles":5.9,"drive":30,"stars":4.5,"rapids":"I-II","usgs":"05426067","startCoord":[43.1891444199919,-88.34167923978947],"endCoord":[43.15333380028965,-88.40067967428392],"below":20,"low":35,"medium":60,"high":80,"above":"81+","notes":"Overlaps - combine?","gaugeName":"Bark River at Nagawicka Road at Delafield, WI - USGS-05426067","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-05426067/#dataTypeId=continuous-00065-0&period=P7D&showFieldMeasurements=true","tripLink":"https://www.wisconsinrivertrips.com/segments/oconomowoc-river/monches"},{"river":"Milwaukee River","trip":"Newburg","type":"Casual","inName":"Falkner Park","outName":"Hwy A Bridge","hours":3,"hoursEst":false,"miles":6,"drive":null,"stars":4,"rapids":"I","usgs":null,"startCoord":[43.43407,-88.04808],"endCoord":[43.46889,-88.05341],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":"Duplicate - combine?","gaugeName":null,"usgsLink":null,"tripLink":"https://www.wisconsinrivertrips.com/segments/milwaukee-river/newburg"},{"river":"Milwaukee River - W. Branch","trip":"Rustic Drive to County Road H","type":"Casual","inName":"Rustic Dr","outName":"County Rd H","hours":3.5,"hoursEst":false,"miles":9.75,"drive":38,"stars":4,"rapids":"Riffles","usgs":"04086500","startCoord":[43.55372,-88.28302],"endCoord":[43.49775,-88.19486],"below":50,"low":100,"medium":200,"high":350,"above":"351+","notes":" ... CFS thresholds from Claude","gaugeName":"Cedar Creek Near Cedarburg, WI - USGS-04086500","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-04086500/#dataTypeId=continuous-00065-0&period=P7D&showFieldMeasurements=true","tripLink":"https://milespaddled.com/milwaukee-river-west-branch/"},{"river":"Kinnickinnic","trip":"S 20th St to S 5th Ct","type":"Whitewater","inName":"S 20th St","outName":"S 5th Ct","hours":0.5,"hoursEst":true,"miles":1.7,"drive":31,"stars":null,"rapids":"II+(IV)","usgs":"04087159","startCoord":[42.9916,-87.93845],"endCoord":[42.9953,-87.91535],"below":150,"low":200,"medium":250,"high":300,"above":"301+","notes":null,"gaugeName":"Kinnickinnic River @ S. 11TH Street @ Milwaukee,wi - USGS-04087159","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-04087159/#period=P7D&dataTypeId=continuous-00060-0&showMedian=true&showFieldMeasurements=true","tripLink":"https://www.americanwhitewater.org/content/River/view/river-detail/10942/main"},{"river":"Southridge Ditch","trip":"S 76th St to Root River Parkway","type":"Whitewater","inName":"S 76th St","outName":"Root River Pkwy","hours":0.5,"hoursEst":true,"miles":0.45,"drive":32,"stars":null,"rapids":"II","usgs":"040871475","startCoord":[42.95039962740867,-88.0087012052536],"endCoord":[42.94769816869629,-88.01575005054474],"below":100,"low":135,"medium":170,"high":200,"above":"201+","notes":null,"gaugeName":"Wilson Park Creek @ Gmia Outfall 7 @ Milwaukee,wi - USGS-040871475","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-040871475/#period=P7D&dataTypeId=continuous-00060-0&showMedian=true&showFieldMeasurements=true","tripLink":"https://www.americanwhitewater.org/content/River/view/river-detail/10998/main"},{"river":"Mineral Springs Creek","trip":"S Ravine St to S Milwaukee St","type":"Whitewater","inName":"S Ravine St","outName":"S Milwaukee St","hours":0.5,"hoursEst":true,"miles":0.51,"drive":22,"stars":null,"rapids":"II+","usgs":"04087030","startCoord":[43.38152646102617,-87.87901639938354],"endCoord":[43.38494564593594,-87.87289559841156],"below":250,"low":400,"medium":600,"high":1000,"above":"1001+","notes":null,"gaugeName":"Menomonee River at Menomonee Falls, WI - USGS-04087030","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-04087030/#dataTypeId=continuous-00065-0&period=P7D&showFieldMeasurements=true","tripLink":"https://www.americanwhitewater.org/content/River/view/river-detail/6505/main"},{"river":"Rubicon River","trip":"Saylesville to Nesho","type":"Casual","inName":"Saylesville Rd","outName":"Woodlawn Park Boat Launch","hours":4,"hoursEst":false,"miles":8.5,"drive":38,"stars":2,"rapids":"Riffles","usgs":null,"startCoord":[43.30064,-88.43835],"endCoord":[43.31191,-88.51365],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":null,"gaugeName":null,"usgsLink":null,"tripLink":"https://milespaddled.com/rubicon-river/"},{"river":"Scuppernong Creek","trip":"Sunset Drive to Gramling Lane","type":"Casual","inName":"Hwy 18","outName":"Gramling Ln","hours":4.25,"hoursEst":false,"miles":8.5,"drive":null,"stars":4,"rapids":"Flatwater","usgs":null,"startCoord":[43.01972,-88.43761],"endCoord":[43.01356,-88.49782],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":"Overlaps - combine?","gaugeName":null,"usgsLink":null,"tripLink":"https://milespaddled.com/scuppernong-creek/"},{"river":"Scuppernong Creek","trip":"Sunset Drive to Manor House Road","type":"Casual","inName":"Hwy 18","outName":"Manor House Rd Boat Ramp","hours":1.5,"hoursEst":false,"miles":3.3,"drive":null,"stars":5,"rapids":"I","usgs":"05426067","startCoord":[43.019805162613906,-88.43735938387273],"endCoord":[42.99250128459068,-88.4585795320655],"below":25,"low":50,"medium":80,"high":110,"above":"111+","notes":"Overlaps - combine?","gaugeName":"Bark River at Nagawicka Road at Delafield, WI - USGS-05426067","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-05426067/#dataTypeId=continuous-00065-0&period=P7D&showFieldMeasurements=true","tripLink":"https://www.wisconsinrivertrips.com/segments/scuppernong-creek"},{"river":"Rock River - E. Branch","trip":"Theresa","type":"Casual","inName":"N Pole Rd","outName":"Gill Rd","hours":3,"hoursEst":false,"miles":6,"drive":null,"stars":4,"rapids":"Riffles","usgs":null,"startCoord":[43.520983772640506,-88.43040376064255],"endCoord":[43.493094446022305,-88.4946456327122],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":null,"gaugeName":null,"usgsLink":null,"tripLink":"https://www.wisconsinrivertrips.com/segments/rock-river-east-branch/theresa"},{"river":"Rock River - E. Branch","trip":"Theresa to Kekoskee","type":"Whitewater","inName":"Theresa","outName":"Kokoskee","hours":5.0,"hoursEst":true,"miles":13,"drive":39,"stars":null,"rapids":"II(IV)","usgs":"05423500","startCoord":[43.5194,-88.45321],"endCoord":[43.5125,-88.5542],"below":260,"low":350,"medium":440,"high":520,"above":"521+","notes":null,"gaugeName":"South Branch Rock River at Waupun, WI - USGS-05423500","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-05423500/#period=P7D&dataTypeId=continuous-00060-0&showMedian=true&showFieldMeasurements=true","tripLink":"https://www.americanwhitewater.org/content/River/view/river-detail/11403/main"},{"river":"Milwaukee River","trip":"Thiensville Village Park to Badger Meter Park","type":"Casual","inName":"Thiensville Village Park","outName":"Badger Meter River Park","hours":2,"hoursEst":false,"miles":4.7,"drive":6,"stars":2.5,"rapids":"Riffles","usgs":null,"startCoord":[43.23095,-87.97864],"endCoord":[43.17775,-87.95637],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":"Duplicate - combine?","gaugeName":null,"usgsLink":null,"tripLink":"https://www.wisconsinrivertrips.com/segments/milwaukee-river/thiensville"},{"river":"Milwaukee River","trip":"V - Grafton to County Highway T","type":"Casual","inName":"14th Ave Parking Lot","outName":"Lakefield Rd","hours":1,"hoursEst":false,"miles":2.75,"drive":17,"stars":5,"rapids":"II","usgs":"04086600","startCoord":[43.31673,-87.94868],"endCoord":[43.29459,-87.94498],"below":200,"low":250,"medium":400,"high":500,"above":"501+","notes":"\"recommend this level\" \"Skilled whitewater above 400 CFS\" ... CFS thresholds from Claude","gaugeName":"Milwaukee River Near Cedarburg, WI - USGS-04086600","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-04086600/#dataTypeId=continuous-00065-0&period=P7D&showFieldMeasurements=true","tripLink":"https://milespaddled.com/milwaukee-river-v/"},{"river":"Milwaukee River","trip":"VI - Fredonia to Grafton","type":"Casual","inName":"Waubedonia Park","outName":"Veterans Memorial Park","hours":3,"hoursEst":false,"miles":13.25,"drive":25,"stars":3,"rapids":"Riffles","usgs":"04086600","startCoord":[43.46838,-87.97317],"endCoord":[43.32211,-87.94948],"below":250,"low":400,"medium":800,"high":1200,"above":"1201+","notes":"\"recommend this level. for reference, the river was high\" ... CFS thresholds from Claude","gaugeName":"Milwaukee River Near Cedarburg, WI - USGS-04086600","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-04086600/#dataTypeId=continuous-00065-0&period=P7D&showFieldMeasurements=true","tripLink":"https://milespaddled.com/milwaukee-river-vi/"},{"river":"Bark River","trip":"VI - Sugar Island Rd to Atkins-Olson Park","type":"Casual","inName":"Sugar Island Rd Boat Launch","outName":"Atkins-Olson Memorial Park","hours":3.333333333,"hoursEst":false,"miles":9.25,"drive":49,"stars":5,"rapids":"Flatwater","usgs":null,"startCoord":[43.05367,-88.43855],"endCoord":[43.02104,-88.49648],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":null,"gaugeName":null,"usgsLink":null,"tripLink":"https://milespaddled.com/bark-river-vi/"},{"river":"Milwaukee River","trip":"VII - West Bend to Newburg","type":"Casual","inName":"Washington St Dam","outName":"County Rd MY","hours":3.166666667,"hoursEst":false,"miles":13,"drive":28,"stars":4,"rapids":"I","usgs":"04086600","startCoord":[43.42755,-88.18335],"endCoord":[43.43427,-88.04782],"below":350,"low":500,"medium":700,"high":900,"above":"901+","notes":"\"recommend this level. for reference, the river was pretty high\" ... CFS thresholds from Claude","gaugeName":"Milwaukee River Near Cedarburg, WI - USGS-04086600","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-04086600/#dataTypeId=continuous-00065-0&period=P7D&showFieldMeasurements=true","tripLink":"https://milespaddled.com/milwaukee-river-vii/"},{"river":"Wildcat Creek","trip":"W Howard Ave to Kulwicki Park","type":"Whitewater","inName":"W Howard Ave","outName":"Kulwicki Park","hours":0.5,"hoursEst":true,"miles":1.5,"drive":30,"stars":null,"rapids":"I-II","usgs":"040871475","startCoord":[42.97373011202524,-88.06787073612213],"endCoord":[42.96582080104915,-88.04730892181396],"below":70,"low":100,"medium":200,"high":300,"above":"301+","notes":null,"gaugeName":"Wilson Park Creek @ Gmia Outfall 7 @ Milwaukee,wi - USGS-040871475","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-040871475/#period=P7D&dataTypeId=continuous-00060-0&showMedian=true&showFieldMeasurements=true","tripLink":"https://www.americanwhitewater.org/content/River/view/river-detail/11410/main"},{"river":"Villa Mann Creek","trip":"W Whitaker Ave to Wilson Park","type":"Whitewater","inName":"W Whitaker Ave","outName":"Wilson Park","hours":0.5,"hoursEst":true,"miles":0.57,"drive":31,"stars":null,"rapids":"II","usgs":"040871475","startCoord":[42.96515346774382,-87.94375956058502],"endCoord":[42.970542958683524,-87.93814837932587],"below":50,"low":100,"medium":150,"high":200,"above":"201+","notes":null,"gaugeName":"Wilson Park Creek @ Gmia Outfall 7 @ Milwaukee,wi - USGS-040871475","usgsLink":"https://waterdata.usgs.gov/monitoring-location/USGS-040871475/#period=P7D&dataTypeId=continuous-00060-0&showMedian=true&showFieldMeasurements=true","tripLink":"https://www.americanwhitewater.org/content/River/view/river-detail/11365/main"},{"river":"Milwaukee River","trip":"Waubeka","type":"Casual","inName":"Hwy A Bridge","outName":"Waubedonia Park","hours":2.5,"hoursEst":false,"miles":5.4,"drive":null,"stars":4,"rapids":"I","usgs":null,"startCoord":[43.46889,-88.05341],"endCoord":[43.46841,-87.97309],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":null,"gaugeName":null,"usgsLink":null,"tripLink":"https://www.wisconsinrivertrips.com/segments/milwaukee-river/waubeka"},{"river":"Milwaukee River","trip":"West Bend","type":"Casual","inName":"West Bend Canoe Launch","outName":"Quaas Creek Park","hours":1.5,"hoursEst":false,"miles":3.9,"drive":null,"stars":4,"rapids":"I(II)","usgs":null,"startCoord":[43.42747,-88.18337],"endCoord":[43.41955,-88.14572],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":null,"gaugeName":null,"usgsLink":null,"tripLink":"https://www.wisconsinrivertrips.com/segments/milwaukee-river/west-bend"},{"river":"Pewaukee River","trip":"Wisconsin Avenue to Wonderland Tap","type":"Casual","inName":"Wisconsin Ave Parking Lot","outName":"Wonderland Tap","hours":3.5,"hoursEst":false,"miles":7.4,"drive":null,"stars":4,"rapids":"I","usgs":null,"startCoord":[43.0842981923193,-88.26355058617],"endCoord":[43.03743894556282,-88.21234157371508],"below":null,"low":null,"medium":null,"high":null,"above":null,"notes":null,"gaugeName":null,"usgsLink":null,"tripLink":"https://www.wisconsinrivertrips.com/segments/pewaukee-river"}];
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let liveData = {};       // usgsId → { flow, stage, trend, series }
+let sortState = {};      // type → { key, dir }
+let fltDrive = null, fltHours = null, fltStars = null, fltRapids = [];
+let fltConds = [];
+
+function toggleCondPanel(e){ togglePanel(e,'condPanel'); }
+function togglePanel(e, id) {
+  e.stopPropagation();
+  document.querySelectorAll('.cond-panel').forEach(p => { if (p.id !== id) p.classList.remove('open'); });
+  document.getElementById(id).classList.toggle('open');
+}
+document.addEventListener('click', e => {
+  // desktop floating panels close on outside click
+  if (window.innerWidth > 640 && !e.target.closest('.cond-filter')) {
+    document.querySelectorAll('.cond-panel').forEach(p => p.classList.remove('open'));
+  }
+  // mobile Filters group closes when clicking outside it (but not on the toggle)
+  if (window.innerWidth <= 640) {
+    const fg = document.getElementById('filterGroup');
+    const tg = document.getElementById('filtersToggle');
+    if (fg && !fg.contains(e.target) && e.target !== tg && !tg.contains(e.target)) {
+      fg.classList.remove('open'); tg.classList.remove('active');
+    }
+  }
+});
+
+// parse a rapids string into the set of classes it contains
+function rapidsRank(str) {
+  if (!str) return 99;
+  const s = String(str);
+  if (/flatwater/i.test(s)) return 0;
+  if (/riffles/i.test(s)) return 1;
+  const order = ['I','II','III','IV','V'];
+  const found = s.match(/(IV|V|III|II|I)/g) || [];
+  let max = -1;
+  found.forEach(c => { const i = order.indexOf(c); if (i > max) max = i; });
+  return max < 0 ? 98 : 2 + max;
+}
+
+function rapidsClasses(str) {
+  if (!str) return [];
+  const s = String(str);
+  if (/flatwater/i.test(s)) return ['Flatwater'];
+  if (/riffles/i.test(s)) return ['Riffles'];
+  const all = s.match(/(IV|V|III|II|I)/g) || [];
+  return [...new Set(all)];
+}
+
+function applyFilters() {
+  const dv = document.getElementById('fltDrive').value;
+  const hv = document.getElementById('fltHours').value;
+  const sv = document.getElementById('fltStars').value;
+  fltDrive  = dv ? parseFloat(dv) : null;
+  fltHours  = hv ? parseFloat(hv) : null;
+  fltStars  = sv ? parseFloat(sv) : null;
+  fltRapids = [...document.querySelectorAll('#rapidsPanel input:checked')].map(i => i.value);
+  const rBtn = document.getElementById('rapidsBtn');
+  rBtn.textContent = fltRapids.length ? 'Rapids: ' + fltRapids.map(x => x==='Flatwater'?'Flat':x==='Riffles'?'Rif':x).join(', ') + ' ▾' : 'Rapids: Any ▾';
+
+  fltConds = [...document.querySelectorAll('#condPanel input:checked')].map(i => i.value);
+  const btn = document.getElementById('condBtn');
+  const labels = { below:'Below', low:'Low', medium:'Medium', high:'High', above:'Above', nodata:'N/A' };
+  btn.textContent = fltConds.length
+    ? 'Condition: ' + fltConds.map(c => labels[c]).join(', ') + ' ▾'
+    : 'Condition: Any ▾';
+
+  getTypes().forEach(type => renderTable(type));
+}
+
+// ─── CONDITION LOGIC ─────────────────────────────────────────────────────────
+function getCondition(trip) {
+  const flow = trip._flow;
+  if (flow === null || flow === undefined) return 'nodata';
+  if (trip.below === null) return 'nodata'; // no thresholds for this trip
+  const belowNum = parseFloat(trip.below);
+  const lowNum   = parseFloat(trip.low);
+  const medNum   = parseFloat(trip.medium);
+  const highNum  = parseFloat(trip.high);
+  if (isNaN(belowNum)) return 'nodata';
+  if (flow < belowNum)  return 'below';
+  if (flow < lowNum)    return 'low';
+  if (flow < medNum)    return 'medium';
+  if (flow < highNum)   return 'high';
+  return 'above';
+}
+
+function sparkline(series, trend) {
+  if (!series || series.length < 2) return '<span style="color:var(--subtext)">—</span>';
+  const w = 72, h = 22, pad = 2;
+  const min = Math.min(...series), max = Math.max(...series);
+  const range = (max - min) || 1;
+  const pts = series.map((v, i) => {
+    const x = pad + (i / (series.length - 1)) * (w - pad * 2);
+    const y = h - pad - ((v - min) / range) * (h - pad * 2);
+    return x.toFixed(1) + ',' + y.toFixed(1);
+  }).join(' ');
+  const color = trend === '↑' ? '#2e9e4f' : trend === '↓' ? '#d63b3b' : '#5a6a7a';
+  return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`
+    + `<title>48h flow: ${min}–${max} CFS</title>`
+    + `<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round"/>`
+    + `</svg> <span style="font-size:0.95rem">${trend}</span>`;
+}
+
+function starIcons(n) {
+  if (n === null || n === undefined) return '<span style="color:var(--subtext)">—</span>';
+  const full = Math.floor(n);
+  const half = (n - full) >= 0.5;
+  const star = f => `<svg width="13" height="13" viewBox="0 0 24 24" style="vertical-align:-2px"><defs><linearGradient id="hg"><stop offset="50%" stop-color="#e8a800"/><stop offset="50%" stop-color="#d8dee6"/></linearGradient></defs><path fill="${f}" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>`;
+  let out = '';
+  for (let i = 0; i < full; i++) out += star('#e8a800');
+  if (half) out += star('url(#hg)');
+  return `<span title="${n} stars" style="white-space:nowrap">${out}</span>`;
+}
+
+function fmtNum(v) { return v === null || v === undefined ? '—' : Math.round(v * 100) / 100; }
+
+function condBadge(cond) {
+  if (cond === 'nodata') return '<span style="color:var(--subtext)">—</span>';
+  const labels = { below:'Below', low:'Low', medium:'Medium', high:'High', above:'Above' };
+  return `<span class="cond-badge badge-${cond}">${labels[cond]||cond}</span>`;
+}
+
+function thresholdText(t) {
+  if (t.below === null) return '—';
+  const ab = String(t.above);
+  return `<${t.below} · ${t.below}–${t.low} · ${t.low}–${t.medium} · ${t.medium}–${ab}`;
+}
+
+// ─── TABLE RENDERING ─────────────────────────────────────────────────────────
+function getTypes() {
+  const types = [...new Set(TRIPS.map(t => t.type))];
+  // Casual always first, then Whitewater, then any future types
+  const order = ['Casual', 'Whitewater'];
+  return types.sort((a, b) => {
+    const ia = order.indexOf(a), ib = order.indexOf(b);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });
+}
+
+function typeIcon(type) {
+  const icons = { Whitewater:'🌊', Casual:'🛶' };
+  return icons[type] || '🚣';
+}
+
+function renderAll() {
+  const container = document.getElementById('sectionsContainer');
+  container.innerHTML = '';
+  getTypes().forEach(type => {
+    const trips = TRIPS.filter(t => t.type === type);
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.id = `section-${type}`;
+    div.innerHTML = `
+      <div class="card-header">
+        <h2>${type} Trips <span class="count">${trips.length} trips</span></h2>
+        <button class="toggle-btn" onclick="toggleSection('${type}')">Hide</button>
+      </div>
+      <div class="table-wrap" id="wrap-${type}">
+        <table>
+          <thead><tr id="thead-${type}"></tr></thead>
+          <tbody id="tbody-${type}">
+            <tr class="loading-row"><td colspan="12">Loading live data…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card-list" id="cards-${type}"></div>`;
+    container.appendChild(div);
+    buildHeader(type);
+    renderTable(type);
+  });
+}
+
+function buildHeader(type) {
+  const th = document.getElementById(`thead-${type}`);
+  const cols = getColumns(type);
+  th.innerHTML = cols.map(c =>
+    `<th onclick="sortBy('${type}','${c.key}')" id="th-${type}-${c.key}">${c.label}</th>`
+  ).join('');
+}
+
+function getColumns(type) {
+  return [
+    { key:'river',     label:'Body of Water' },
+    { key:'trip',      label:'Trip' },
+    ...(type !== 'Whitewater' ? [{ key:'stars', label:'Stars' }] : []),
+    { key:'rapids',    label:'Rapids' },
+    { key:'condition', label:'Condition' },
+    { key:'drive',     label:'Drive (min)' },
+    { key:'hours',     label:'Hours' },
+    { key:'miles',     label:'Miles' },
+    { key:'flow',      label:'Flow (CFS)' },
+    { key:'stage',     label:'Gage (ft)' },
+    { key:'trend',     label:'History' },
+    { key:'gauge',     label:'Gauge' },
+  ];
+}
+
+let TYPE_TOTALS = {};
+function renderTable(type) {
+  const tbody = document.getElementById(`tbody-${type}`);
+  if (!tbody) return;
+  const ss = sortState[type] || { key: 'drive', dir: 1 };
+  let trips = TRIPS.filter(t => t.type === type);
+
+  // attach live data
+  trips.forEach(t => {
+    const key = normId(t.usgs);
+    const d = key ? liveData[key] : null;
+    t._flow  = d?.flow  ?? null;
+    t._drive = t.driveLive ?? t.drive;
+    t._stage = d?.stage ?? null;
+    t._trend = d?.trend ?? '—';
+    t._series = d?.series ?? null;
+    t._condition = getCondition(t);
+  });
+
+  // condition multi-select filter
+  if (fltConds.length) {
+    trips = trips.filter(t => fltConds.includes(t._condition));
+  }
+  // rapids filter (multi): match any selected class present; TBD/blank always shown
+  if (fltRapids.length) {
+    trips = trips.filter(t => !t.rapids || rapidsClasses(t.rapids).some(c => fltRapids.includes(c)));
+  }
+  // header filters: drive/hours require data when active; unrated stars always shown
+  if (fltDrive !== null) trips = trips.filter(t => t._drive === null || t._drive === undefined || t._drive <= fltDrive);
+  if (fltHours !== null) trips = trips.filter(t => t.hours === null || t.hours <= fltHours);
+  if (fltStars !== null) trips = trips.filter(t => t.stars === null || t.stars >= fltStars);
+
+  // sort
+  trips.sort((a, b) => {
+    let av = a[ss.key] ?? a['_'+ss.key] ?? '';
+    let bv = b[ss.key] ?? b['_'+ss.key] ?? '';
+    if (ss.key === 'condition') { av = a._condition; bv = b._condition; }
+    if (ss.key === 'drive') { av = a._drive ?? Infinity; bv = b._drive ?? Infinity; }
+    if (ss.key === 'stars') { av = a.stars ?? -Infinity; bv = b.stars ?? -Infinity; }
+    if (ss.key === 'rapids') { av = rapidsRank(a.rapids); bv = rapidsRank(b.rapids); }
+    if (ss.key === 'hours') { av = a.hours ?? Infinity; bv = b.hours ?? Infinity; }
+    if (ss.key === 'miles') { av = a.miles ?? Infinity; bv = b.miles ?? Infinity; }
+    if (ss.key === 'flow')  { av = a._flow  ?? -Infinity; bv = b._flow  ?? -Infinity; }
+    if (ss.key === 'stage') { av = a._stage ?? -Infinity; bv = b._stage ?? -Infinity; }
+    if (av < bv) return -ss.dir;
+    if (av > bv) return  ss.dir;
+    return 0;
+  });
+
+  // update sort indicators
+  getColumns(type).forEach(c => {
+    const el = document.getElementById(`th-${type}-${c.key}`);
+    if (!el) return;
+    el.className = '';
+    if (ss.key === c.key) el.className = ss.dir === 1 ? 'sorted-asc' : 'sorted-desc';
+  });
+
+  const cardList = document.getElementById(`cards-${type}`);
+
+  // update "X of XX trips" in section header
+  const total = TYPE_TOTALS[type] ?? (TYPE_TOTALS[type] = TRIPS.filter(t => t.type === type).length);
+  const countEl = document.querySelector(`#section-${type} .count`);
+  if (countEl) countEl.textContent = trips.length === total ? `${total} trips` : `${trips.length} of ${total} trips`;
+
+  if (!trips.length) {
+    tbody.innerHTML = `<tr class="loading-row"><td colspan="${getColumns(type).length}">No trips match your current filters</td></tr>`;
+    if (cardList) cardList.innerHTML = `<div class="card-empty">No trips match your current filters</div>`;
+    return;
+  }
+
+  tbody.innerHTML = trips.map(t => {
+    const cond = t._condition;
+    const flow  = t._flow  !== null ? t._flow.toLocaleString()  : '—';
+    const stage = t._stage !== null ? t._stage.toFixed(2) : '—';
+    const trend = sparkline(t._series, t._trend || '—');
+    const tripName = t.tripLink
+      ? `<a href="${t.tripLink}" target="_blank" rel="noopener">${t.trip}</a>`
+      : t.trip;
+    const gaugeHtml = t.usgsLink
+      ? `<a href="${t.usgsLink}" target="_blank" rel="noopener" title="${t.gaugeName||''}">🔗 USGS</a>`
+      : (t.gaugeName && t.gaugeName !== '-' ? `<span title="${t.gaugeName}" style="font-size:0.75rem;color:var(--subtext)">${t.gaugeName.replace(/ - USGS.*/,'').substring(0,30)}…</span>` : '—');
+
+    return `<tr class="cond-${cond}" onclick="openTripModal(${TRIPS.indexOf(t)}, event)">
+      <td class="river-name">${t.river}</td>
+      <td class="trip-name">${tripName}</td>
+      ${type !== 'Whitewater' ? `<td class="cond-cell">${starIcons(t.stars)}</td>` : ''}
+      <td class="cond-cell">${t.rapids ?? '—'}</td>
+      <td class="cond-cell">${condBadge(cond)}</td>
+      <td class="drive-cell" title="${t.driveLive != null ? 'Live estimate from your location' : 'From spreadsheet'}">${t._drive ?? '—'}</td>
+      <td class="num-cell">${t.hours!=null ? (t.hoursEst?'~':'')+fmtNum(t.hours) : '—'}</td>
+      <td class="num-cell">${fmtNum(t.miles)}</td>
+      <td class="flow-cell">${flow}</td>
+      <td class="stage-cell">${stage}</td>
+      <td class="trend-cell">${trend}</td>
+      <td class="usgs-link">${gaugeHtml}</td>
+    </tr>`;
+  }).join('');
+
+  // mobile card view (same data, sort, and filter as the table)
+  if (cardList) {
+    cardList.innerHTML = trips.map(t => {
+      const cond = t._condition;
+      const flow  = t._flow  !== null ? t._flow.toLocaleString()  : '—';
+      const stage = t._stage !== null ? t._stage.toFixed(2) : '—';
+      return `<div class="trip-card cond-${cond}" onclick="openTripModal(${TRIPS.indexOf(t)}, event)">
+        <div class="trip-card-top">
+          <div>
+            <div class="trip-card-name">${t.river} ${t.type !== 'Whitewater' && t.stars != null ? '<span style="margin-left:2px">'+starIcons(t.stars)+'</span>' : ''}</div>
+            <div class="trip-card-trip">${t.trip}</div>
+          </div>
+          ${condBadge(cond)}
+        </div>
+        <div class="trip-card-stats">
+          <span><span class="stat-label">Drive</span> <b>${t._drive ?? '—'}</b> min</span>
+          <span><span class="stat-label">Hours</span> <b>${t.hours!=null ? (t.hoursEst?'~':'')+fmtNum(t.hours) : '—'}</b></span>
+          <span><span class="stat-label">Miles</span> <b>${fmtNum(t.miles)}</b></span>
+          <span><span class="stat-label">Flow</span> <b>${flow}</b> CFS</span>
+          <span><span class="stat-label">Gage</span> <b>${stage}</b> ft</span>
+          <span>${sparkline(t._series, t._trend || '—')}</span>
+        </div>
+      </div>`;
+    }).join('');
+  }
+}
+
+function sortBy(type, key) {
+  const ss = sortState[type] || { key: null, dir: 1 };
+  if (ss.key === key) {
+    sortState[type] = { key, dir: ss.dir * -1 };
+  } else {
+    sortState[type] = { key, dir: 1 };
+  }
+  renderTable(type);
+}
+
+function toggleMap() {
+  const m = document.getElementById('map');
+  const btn = document.querySelector('#map').closest('.card').querySelector('.toggle-btn');
+  const hidden = m.classList.toggle('hidden');
+  btn.textContent = hidden ? 'Show' : 'Hide';
+  if (!hidden && window.nspMap) setTimeout(() => window.nspMap.invalidateSize(), 50);
+}
+
+function toggleFilterGroup(e) {
+  e.stopPropagation();
+  document.getElementById('filterGroup').classList.toggle('open');
+  document.getElementById('filtersToggle').classList.toggle('active');
+}
+
+function toggleSection(type) {
+  const wrap = document.getElementById(`wrap-${type}`);
+  const cards = document.getElementById(`cards-${type}`);
+  const btn = document.querySelector(`#section-${type} .toggle-btn`);
+  const nowHidden = wrap.classList.toggle('hidden');
+  if (cards) cards.style.display = nowHidden ? 'none' : '';
+  btn.textContent = nowHidden ? 'Show' : 'Hide';
+}
+
+// ─── USGS LIVE DATA ──────────────────────────────────────────────────────────
+const normId = id => id ? String(parseInt(id, 10)) : null;
+
+async function fetchUSGS() {
+  const ids = [...new Set(TRIPS.map(t => t.usgs).filter(Boolean))];
+  const usgsUrl = 'https://waterservices.usgs.gov/nwis/iv/?format=json'
+    + '&sites=' + ids.join(',')
+    + '&parameterCd=00060,00065'
+    + '&period=P2D';
+
+  // Proxies ordered by reliability with file:// null-origin requests
+  async function tryCodetabs() {
+    const res = await fetch('https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(usgsUrl), { cache: 'no-cache' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return res.json();
+  }
+  async function tryAlloriginsGet() {
+    const res = await fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(usgsUrl), { cache: 'no-cache' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const wrapper = await res.json();
+    return JSON.parse(wrapper.contents);
+  }
+  async function tryCorsProxy() {
+    // Note: corsproxy.io now requires the ?url= parameter format
+    const res = await fetch('https://corsproxy.io/?url=' + encodeURIComponent(usgsUrl), { cache: 'no-cache' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return res.json();
+  }
+  async function tryDirect() {
+    const res = await fetch(usgsUrl, { cache: 'no-cache', referrerPolicy: 'no-referrer' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return res.json();
+  }
+
+  const attempts = [tryCodetabs, tryAlloriginsGet, tryCorsProxy, tryDirect];
+  let data = null;
+  for (let i = 0; i < attempts.length; i++) {
+    try {
+      console.log('[NSP] USGS fetch attempt', i + 1);
+      document.getElementById('updatedTime').textContent = `Fetching live USGS data… (attempt ${i+1} of ${attempts.length})`;
+      data = await attempts[i]();
+      console.log('[NSP] USGS fetch success on attempt', i + 1);
+      break;
+    } catch (e) {
+      console.warn('[NSP] Attempt', i + 1, 'failed:', e.message);
+    }
+  }
+
+  let usingCache = false;
+  if (data) {
+    // cache successful response
+    try {
+      localStorage.setItem('nsp_usgs_cache', JSON.stringify({ ts: Date.now(), data }));
+    } catch(e) {}
+  } else {
+    // all proxies failed — fall back to cached data if available
+    try {
+      const cached = JSON.parse(localStorage.getItem('nsp_usgs_cache'));
+      if (cached?.data) {
+        data = cached.data;
+        usingCache = true;
+        console.log('[NSP] Using cached data from', new Date(cached.ts).toLocaleString());
+      }
+    } catch(e) {}
+  }
+
+  if (!data) {
+    document.getElementById('updatedTime').innerHTML =
+      '⚠️ Live data unavailable — <a href="#" onclick="fetchUSGS();return false;" style="color:var(--navy-mid)">Retry</a>';
+    return;
+  }
+
+  data.value?.timeSeries?.forEach(s => {
+    const site  = normId(s.sourceInfo.siteCode[0].value);
+    const param = s.variable.variableCode[0].value;
+    const vals  = s.values[0]?.value;
+    if (!liveData[site]) liveData[site] = {};
+    if (vals?.length) {
+      const clean = vals.filter(v => parseFloat(v.value) > -999990);
+      if (!clean.length) return;
+      const latest = parseFloat(clean.at(-1).value);
+      const past   = parseFloat(clean[0].value);
+      if (param === '00060') {
+        liveData[site].flow  = isNaN(latest) ? null : latest;
+        liveData[site].trend = (latest > past) ? '↑' : (latest < past) ? '↓' : '→';
+        // downsample full series to ~40 points for sparkline
+        const nums = clean.map(v => parseFloat(v.value)).filter(n => !isNaN(n));
+        const step = Math.max(1, Math.floor(nums.length / 40));
+        liveData[site].series = nums.filter((_, idx) => idx % step === 0);
+      }
+      if (param === '00065') {
+        liveData[site].stage = isNaN(latest) ? null : latest;
+      }
+    }
+  });
+
+  getTypes().forEach(type => renderTable(type));
+  updateMapPins();
+  document.getElementById('updatedTime').textContent = usingCache
+    ? '⚠️ Showing cached data (live fetch failed) — last successful update: ' +
+      new Date(JSON.parse(localStorage.getItem('nsp_usgs_cache')).ts).toLocaleString()
+    : 'Last updated: ' + new Date().toLocaleString();
+}
+
+// ─── MAP ──────────────────────────────────────────────────────────────────────
+const mapMarkers = [];  // { marker, trip }
+
+const CONDITION_COLORS = {
+  below:  { fill: '#e05a2b', stroke: '#a83e1a' },
+  low:    { fill: '#e8c400', stroke: '#a08600' },
+  medium: { fill: '#2e9e4f', stroke: '#1d6f36' },
+  high:   { fill: '#7db500', stroke: '#567d00' },
+  above:  { fill: '#d63b3b', stroke: '#992424' },
+  nodata: { fill: '#b0bec5', stroke: '#78909c' },
+};
+
+let nspMap = null; window.nspMap = null;
+
+function initMap() {
+  window.nspMap = nspMap = L.map('map');
+  const map = nspMap;
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors'
+  }).addTo(map);
+
+  TRIPS.forEach(t => {
+    if (t.startCoord) {
+      const c = CONDITION_COLORS.nodata;
+      const marker = L.circleMarker(t.startCoord, {
+        radius: 7, fillColor: c.fill, color: c.stroke,
+        weight: 2, opacity: 1, fillOpacity: 0.9
+      }).addTo(map).on('click', () => openTripModal(TRIPS.indexOf(t)));
+      mapMarkers.push({ marker, trip: t });
+    }
+  });
+
+  // default view: fit all trip pins
+  const allCoords = TRIPS.filter(t => t.startCoord).map(t => t.startCoord);
+  if (allCoords.length) {
+    map.fitBounds(L.latLngBounds(allCoords), { padding: [25, 25] });
+  } else {
+    map.setView([43.15, -88.05], 10);
+  }
+}
+
+function showUserOnMap(lat, lng) {
+  if (!nspMap) return;
+  // pulsing blue dot for user location
+  L.circleMarker([lat, lng], {
+    radius: 9, fillColor: '#1e88e5', color: '#ffffff',
+    weight: 3, opacity: 1, fillOpacity: 1
+  }).addTo(nspMap).bindPopup('<b>You are here</b>');
+  // re-fit bounds to include user location alongside all pins
+  const allCoords = TRIPS.filter(t => t.startCoord).map(t => t.startCoord);
+  allCoords.push([lat, lng]);
+  nspMap.fitBounds(L.latLngBounds(allCoords), { padding: [25, 25] });
+}
+
+function updateMapPins() {
+  mapMarkers.forEach(({ marker, trip }) => {
+    const d = trip.usgs ? liveData[normId(trip.usgs)] : null;
+    trip._flow = d?.flow ?? null;
+    const cond = getCondition(trip);
+    const c = CONDITION_COLORS[cond] || CONDITION_COLORS.nodata;
+    marker.setStyle({ fillColor: c.fill, color: c.stroke });
+  });
+}
+
+// ─── TRIP MODAL ──────────────────────────────────────────────────────────────
+function lastDateAt(usgs, thr, needBelow) {
+  const arr = HIST_DAILY[normId(usgs)];
+  if (!arr?.length) return null;
+  for (let i = arr.length - 1; i >= 0; i--) {
+    const [d, f] = arr[i];
+    if (needBelow ? f < thr : f >= thr) return d;
+  }
+  return null;
+}
+
+function lastDateText(usgs, thr, needBelow) {
+  const d = lastDateAt(usgs, thr, needBelow);
+  const when = d
+    ? new Date(d + 'T12:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+    : 'not in the past year';
+  return ` <span style="font-size:0.8rem;color:var(--subtext)">(last: ${when})</span>`;
+}
+
+function currentCondHtml(t) {
+  // pull live flow and compute condition (same logic as tables)
+  const d = t.usgs ? liveData[normId(t.usgs)] : null;
+  const flow = d?.flow ?? null;
+  if (flow === null) return '';
+  t._flow = flow;
+  const cond = getCondition(t);
+
+  let html = `<div class="modal-row"><b>Current flow:</b> ${flow.toLocaleString()} CFS &nbsp;${condBadge(cond)}</div>`;
+
+  if (t.below !== null) {
+    const lo = parseFloat(t.below), lowT = parseFloat(t.low),
+          medT = parseFloat(t.medium), hiT = parseFloat(t.high);
+    if (cond === 'medium') {
+      html += `<div class="modal-row"><b>Ideal range:</b> ${lowT.toLocaleString()}–${medT.toLocaleString()} CFS</div>`;
+    } else if (cond === 'below') {
+      html += `<div class="modal-row">${condBadge('low')} needs ≥${lo.toLocaleString()} CFS${lastDateText(t.usgs, lo, false)}</div>`;
+    } else if (cond === 'low') {
+      html += `<div class="modal-row">${condBadge('medium')} needs ≥${lowT.toLocaleString()} CFS${lastDateText(t.usgs, lowT, false)}</div>`;
+    } else if (cond === 'high') {
+      html += `<div class="modal-row">${condBadge('medium')} needs <${medT.toLocaleString()} CFS${lastDateText(t.usgs, medT, true)}</div>`;
+    } else if (cond === 'above') {
+      html += `<div class="modal-row">${condBadge('high')} needs <${hiT.toLocaleString()} CFS${lastDateText(t.usgs, hiT, true)}</div>`;
+    }
+  }
+  return html;
+}
+
+function openTripModal(idx, ev) {
+  // don't hijack clicks on links inside the row
+  if (ev && ev.target.tagName === 'A') return;
+  const t = TRIPS[idx];
+  if (!t) return;
+
+  const hasCoord = !!t.startCoord;
+  const fmtLoc = (name, coord) => {
+    const g = coord ? `(${coord[0].toFixed(2)}, ${coord[1].toFixed(2)})` : '';
+    if (name && g) return `${name} ${g}`;
+    if (name) return name;
+    if (g) return g.slice(1, -1);
+    return null;
+  };
+  const dirLink = (coord, label) => coord
+    ? `<a href="https://www.google.com/maps/dir/?api=1&destination=${coord[0]},${coord[1]}" target="_blank" rel="noopener" style="color:var(--navy-mid)">${label}</a>`
+    : label;
+  const putinText = t.startCoord
+    ? dirLink(t.startCoord, fmtLoc(t.inName, t.startCoord))
+    : (fmtLoc(t.inName, t.startCoord) ?? 'No put-in info available');
+  const takeoutText = t.endCoord
+    ? dirLink(t.endCoord, fmtLoc(t.outName, t.endCoord))
+    : fmtLoc(t.outName, t.endCoord);
+  const paddleParts = [];
+  if (t.hours !== null) paddleParts.push((t.hoursEst?'~':'')+fmtNum(t.hours) + ' hrs');
+  if (t.miles !== null) paddleParts.push(fmtNum(t.miles) + ' mi');
+  const paddleText = paddleParts.join(' · ');
+  const mapsLink = hasCoord
+    ? `<a class="maps-link" href="https://www.google.com/maps/dir/?api=1&destination=${t.startCoord[0]},${t.startCoord[1]}" target="_blank" rel="noopener">Open Directions to Put-In</a>`
+    : '';
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  overlay.innerHTML = `
+    <div class="modal-box">
+      <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
+      <h3>${t.river}</h3>
+      <div class="modal-trip">${t.trip}</div>
+      ${t.tripLink ? `<div class="modal-row" style="margin-top:-8px;margin-bottom:12px"><a href="${t.tripLink}" target="_blank" rel="noopener" style="color:var(--navy-mid);font-weight:600;font-size:0.85rem">Trip Info & Description →</a></div>` : ''}
+      ${currentCondHtml(t)}
+      <div class="modal-row"><b>Put-in:</b> ${putinText}</div>
+      ${paddleText ? `<div class="modal-row"><b>Paddle:</b> ${paddleText}</div>` : ''}
+      ${takeoutText ? `<div class="modal-row"><b>Take-out:</b> ${takeoutText}</div>` : ''}
+      <div class="modal-row"><b>Drive:</b> ${t.driveLive ?? t.drive} min${t.driveLive != null ? ' (from your location)' : ''}</div>
+      ${histSummaryHtml(t)}
+      ${histChartHtml(t)}
+      ${mapsLink}
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
+// ─── HISTORICAL RUNNABILITY (USGS 10-yr daily values, cached 30 days) ────────
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+let HIST_DAILY = {};  // site → [[date, cfs], ...] most recent ~400 days
+
+function applyHistStats(stats) {
+  Object.entries(stats).forEach(([idx, pct]) => {
+    if (TRIPS[idx]) TRIPS[idx].histPct = pct;
+  });
+}
+
+async function fetchHistory() {
+  // use cached stats if fresh (30 days)
+  try {
+    const c = JSON.parse(localStorage.getItem('nsp_hist_v9'));
+    if (c?.stats && Date.now() - c.ts < 30 * 864e5) {
+      applyHistStats(c.stats);
+      HIST_DAILY = c.daily || {};
+      console.log('[NSP] Historical stats loaded from cache');
+      return;
+    }
+  } catch(e) {}
+
+  const tripsWithTh = TRIPS.filter(t => t.usgs && t.below !== null);
+  const ids = [...new Set(tripsWithTh.map(t => t.usgs))];
+  if (!ids.length) return;
+
+  const end = new Date();
+  const start = new Date(end.getFullYear() - 10, end.getMonth(), 1);
+  const fmt = d => d.toISOString().slice(0, 10);
+  const url = 'https://waterservices.usgs.gov/nwis/dv/?format=json'
+    + '&sites=' + ids.join(',')
+    + '&parameterCd=00060&statCd=00003'
+    + '&startDT=' + fmt(start) + '&endDT=' + fmt(end);
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+
+    // bucket daily flows per site per month (+ keep recent daily series for lookups)
+    const siteMonthly = {};
+    const siteDaily = {};
+    data.value?.timeSeries?.forEach(s => {
+      const site = normId(s.sourceInfo.siteCode[0].value);
+      if (!siteMonthly[site]) siteMonthly[site] = Array.from({length:12}, () => []);
+      if (!siteDaily[site]) siteDaily[site] = [];
+      (s.values[0]?.value || []).forEach(v => {
+        const f = parseFloat(v.value);
+        if (isNaN(f) || f < -999990) return;
+        const m = parseInt(v.dateTime.slice(5, 7), 10) - 1;
+        siteMonthly[site][m].push(f);
+        siteDaily[site].push([v.dateTime.slice(0, 10), f]);
+      });
+    });
+    // keep only the most recent ~400 days per site
+    Object.keys(siteDaily).forEach(k => { siteDaily[k] = siteDaily[k].slice(-400); });
+    HIST_DAILY = siteDaily;
+
+    // per-trip: % of days per month within runnable band [below, high)
+    const stats = {};
+    tripsWithTh.forEach(t => {
+      const buckets = siteMonthly[normId(t.usgs)];
+      if (!buckets) return;
+      const lo = parseFloat(t.below), hi = parseFloat(t.high);
+      if (isNaN(lo) || isNaN(hi)) return;
+      const pct = buckets.map(a => {
+        if (!a.length) return null;
+        return Math.round(100 * a.filter(f => f >= lo && f < hi).length / a.length);
+      });
+      stats[TRIPS.indexOf(t)] = pct;
+    });
+
+    applyHistStats(stats);
+    try { localStorage.setItem('nsp_hist_v9', JSON.stringify({ ts: Date.now(), stats, daily: HIST_DAILY })); } catch(e) {}
+    console.log('[NSP] Historical stats computed for', Object.keys(stats).length, 'trips');
+  } catch(e) {
+    console.warn('[NSP] Historical stats failed:', e.message);
+  }
+}
+
+function histSummaryHtml(t) {
+  if (!t.histPct) return '';
+  const m = new Date().getMonth();
+  const cur = t.histPct[m];
+  if (cur === null || cur === undefined) return '';
+
+  let text = `<b>Runnable this month:</b> ~${cur}% of ${MONTH_NAMES[m]} days`;
+
+  if (cur >= 33) {
+    // current month already clears 33% — no extra line needed
+  } else {
+    // find the SOONEST upcoming month that clears 33% (cycling forward)
+    let nextIdx = -1, nextPct = 0;
+    for (let i = 1; i <= 11; i++) {
+      const mi = (m + i) % 12;
+      const p = t.histPct[mi];
+      if (p !== null && p >= 33) { nextIdx = mi; nextPct = p; break; }
+    }
+    if (nextIdx >= 0) {
+      text += `<br><b>Next best window:</b> ${MONTH_NAMES[nextIdx]} (~${nextPct}%)`;
+    } else {
+      // no month clears 33% — report the strongest month anyway
+      let topIdx = -1, topPct = -1;
+      t.histPct.forEach((p, i) => {
+        if (p !== null && p > topPct) { topPct = p; topIdx = i; }
+      });
+      text += `<br>This trip usually needs a rain event`;
+      if (topIdx >= 0) {
+        text += `<br>Best odds in ${MONTH_NAMES[topIdx]} (~${topPct}% of days)`;
+      }
+    }
+  }
+  return `<div class="modal-row">${text}</div>`;
+}
+
+function histChartHtml(t) {
+  if (!t.histPct) return '';
+  const m = new Date().getMonth();
+  const labels = ['J','F','M','A','M','J','J','A','S','O','N','D'];
+  const w = 312, h = 64, barW = 20, gap = 6, chartH = 46;
+
+  let bars = '';
+  t.histPct.forEach((p, i) => {
+    const x = i * (barW + gap);
+    const pct = p ?? 0;
+    const barH = Math.max(2, (pct / 100) * chartH);
+    const y = chartH - barH;
+    // color intensity scales with pct
+    const green = pct >= 50 ? '#2e9e4f' : pct >= 25 ? '#7dba8e' : '#c5ddca';
+    const isCur = i === m;
+    bars += `<g>`
+      + `<title>${MONTH_NAMES[i]}: ${p === null ? 'no data' : '~' + p + '%'}</title>`
+      + `<rect x="${x}" y="${y}" width="${barW}" height="${barH}" rx="2" fill="${green}"`
+      + (isCur ? ` stroke="#0d2c54" stroke-width="2"` : '')
+      + `/>`
+      + `<text x="${x + barW/2}" y="${h - 4}" text-anchor="middle" font-size="9" fill="${isCur ? '#0d2c54' : '#8a9aaa'}" font-weight="${isCur ? '700' : '400'}">${labels[i]}</text>`
+      + `</g>`;
+  });
+
+  return `<div class="modal-row" style="margin-top:10px">
+    <svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="max-width:100%">${bars}</svg>
+  </div>`;
+}
+
+// ─── RAIN FORECAST (National Weather Service — free, no key) ─────────────────
+let FORECAST_URL = null;
+let FORECAST_PERIODS = null;
+let QPF_BY_DAY = {};
+
+async function fetchRain() {
+  try {
+    // center of trip area
+    const pt = await (await fetch('https://api.weather.gov/points/43.15,-88.05')).json();
+    const gridUrl = pt.properties?.forecastGridData;
+    FORECAST_URL = pt.properties?.forecast || null;
+    if (!gridUrl) throw new Error('no grid URL');
+    const grid = await (await fetch(gridUrl)).json();
+    const qpf = grid.properties?.quantitativePrecipitation?.values || [];
+
+    // sum precipitation (mm) for periods starting within next 24h
+    const now = Date.now();
+    const cutoff = now + 24 * 3600 * 1000;
+    let totalMm = 0;
+    qpf.forEach(v => {
+      const start = new Date(v.validTime.split('/')[0]).getTime();
+      if (start >= now - 3600e3 && start < cutoff && v.value) totalMm += v.value;
+    });
+
+    // per-day rainfall totals for the 7-day modal
+    QPF_BY_DAY = {};
+    qpf.forEach(v => {
+      const day = v.validTime.split('/')[0].slice(0, 10);
+      if (v.value) QPF_BY_DAY[day] = (QPF_BY_DAY[day] || 0) + v.value;
+    });
+
+    const inches = totalMm / 25.4;
+    const badge = document.getElementById('rainBadge');
+    badge.style.display = 'flex';
+    badge.style.cursor = 'pointer';
+    badge.title = 'Click for 7-day forecast';
+    badge.onclick = openForecastModal;
+    badge.innerHTML = inches >= 0.01
+      ? `🌧 ${inches.toFixed(2)}" rain next 24h`
+      : `☀️ No rain expected next 24h`;
+  } catch(e) {
+    console.warn('[NSP] Rain forecast failed:', e.message);
+  }
+}
+
+function capFirst(s){ return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s; }
+async function openForecastModal() {
+  if (!FORECAST_URL) return;
+  try {
+    if (!FORECAST_PERIODS) {
+      const fc = await (await fetch(FORECAST_URL)).json();
+      FORECAST_PERIODS = fc.properties?.periods || [];
+    }
+    // merge day/night periods into one row per calendar day
+    const byDay = new Map();
+    FORECAST_PERIODS.forEach(p => {
+      const key = p.startTime.slice(0, 10);
+      if (!byDay.has(key)) byDay.set(key, { date: key, name: null, hi: null, lo: null, pop: null, text: null, nightName: null, nightText: null });
+      const d = byDay.get(key);
+      const pop = p.probabilityOfPrecipitation?.value;
+      if (pop != null) d.pop = Math.max(d.pop ?? 0, pop);
+      if (p.isDaytime) {
+        d.name = p.name; d.hi = p.temperature; d.text = p.shortForecast;
+      } else {
+        d.nightName = p.name; d.lo = p.temperature; d.nightText = p.shortForecast;
+      }
+    });
+    const rows = [...byDay.values()].slice(0, 7).map(d => {
+      const name = d.name ?? d.nightName;
+      const temp = (d.hi !== null && d.lo !== null) ? `${d.hi}°/${d.lo}°`
+                 : (d.hi !== null ? `${d.hi}°` : `${d.lo}°`);
+      const popText = (d.pop != null && d.pop > 0) ? `<span style="color:var(--navy-mid);font-weight:600">${d.pop}%</span>` : '<span style="color:var(--subtext)">—</span>';
+      const mm = QPF_BY_DAY[d.date] || 0;
+      const inch = mm / 25.4;
+      const inchText = inch >= 0.01 ? `<span style="color:var(--navy-mid);font-weight:600">${inch.toFixed(2)}"</span>` : '<span style="color:var(--subtext)">—</span>';
+      return `<div style="display:flex;gap:10px;align-items:baseline;padding:7px 0;border-bottom:1px solid #eef2f8;font-size:0.85rem">
+        <div style="flex:0 0 92px;font-weight:600;color:var(--navy)">${name}</div>
+        <div style="flex:0 0 58px">${temp}</div>
+        <div style="flex:0 0 40px">${popText}</div>
+        <div style="flex:0 0 44px">${inchText}</div>
+        <div style="flex:1;color:var(--subtext)">${capFirst(d.text ?? d.nightText)}</div>
+      </div>`;
+    }).join('');
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+    overlay.innerHTML = `
+      <div class="modal-box" style="max-width:460px;max-height:80vh;overflow-y:auto">
+        <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">×</button>
+        <h3>7-Day Forecast</h3>
+        <div class="modal-trip">Greater Milwaukee trip area · National Weather Service</div>
+        <div style="display:flex;gap:10px;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--subtext);padding-bottom:4px">
+          <div style="flex:0 0 92px">Day</div><div style="flex:0 0 58px">Hi/Lo</div><div style="flex:0 0 40px">Rain</div><div style="flex:0 0 44px">Amt</div><div style="flex:1">Forecast</div>
+        </div>
+        ${rows}
+      </div>`;
+    document.body.appendChild(overlay);
+  } catch(e) {
+    console.warn('[NSP] Forecast detail failed:', e.message);
+  }
+}
+
+// ─── LIVE DRIVE TIMES (browser geolocation + OSRM routing, free/no key) ──────
+function fetchDriveTimes() {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(async pos => {
+    try {
+      const { latitude: lat, longitude: lng } = pos.coords;
+      showUserOnMap(lat, lng);
+      const dests = TRIPS.filter(t => t.startCoord);
+      // OSRM expects lng,lat — user location first (index 0)
+      const coords = [`${lng},${lat}`]
+        .concat(dests.map(t => `${t.startCoord[1]},${t.startCoord[0]}`))
+        .join(';');
+      const url = `https://router.project-osrm.org/table/v1/driving/${coords}?sources=0&annotations=duration`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      const durations = data.durations?.[0];
+      if (!durations) throw new Error('no durations');
+      dests.forEach((t, i) => {
+        const sec = durations[i + 1]; // index 0 is user→user
+        if (sec != null) t.driveLive = Math.round(sec / 60);
+      });
+      console.log('[NSP] Live drive times loaded for', dests.length, 'trips');
+      getTypes().forEach(type => renderTable(type));
+    } catch(e) {
+      console.warn('[NSP] Drive time fetch failed:', e.message);
+    }
+  }, err => {
+    console.log('[NSP] Geolocation unavailable/denied — using spreadsheet drive times');
+  }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 10 * 60 * 1000 });
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  renderAll();
+  initMap();
+  fetchUSGS();
+  fetchRain();
+  fetchDriveTimes();
+  setTimeout(fetchHistory, 3000);
+  // auto-refresh live data every 15 minutes
+  setInterval(() => { fetchUSGS(); fetchRain(); }, 15 * 60 * 1000);
+});
+</script>
+</body>
+</html>
