@@ -1482,13 +1482,21 @@ async function fetchUSGS() {
         const step = Math.max(1, Math.floor(recentNums.length / 40));
         liveData[site].series = recentNums.filter((_, idx) => idx % step === 0);
 
-        // Full 7-day decay rate (CFS/day), for the "days until next level" estimate.
-        // Only meaningful when genuinely falling — a rising/flat river has no
-        // crossing to predict, so leave it null and let the popup hide the line.
-        const firstTime = new Date(clean[0].dateTime).getTime();
-        const daysSpan = (latestTime - firstTime) / (1000 * 3600 * 24);
-        if (daysSpan >= 3 && latest < past) {  // require a real multi-day span and a genuine decline
-          liveData[site].decayPerDay = (past - latest) / daysSpan;  // positive number = CFS lost per day
+        // Decay rate (CFS/day), for the "days until next level" estimate.
+        // Measured from the highest point in the 7-day window to now — NOT a
+        // simple 7-days-ago-vs-now comparison, which breaks if the river rose
+        // to a peak mid-week and has only been declining for the last day or
+        // two: comparing against the (lower) value from 7 days ago would wash
+        // out a real, recent decline. Finding the actual peak and measuring
+        // from there catches that case correctly.
+        let peakVal = -Infinity, peakTime = latestTime;
+        clean.forEach(v => {
+          const n = parseFloat(v.value);
+          if (!isNaN(n) && n > peakVal) { peakVal = n; peakTime = new Date(v.dateTime).getTime(); }
+        });
+        const daysSincePeak = (latestTime - peakTime) / (1000 * 3600 * 24);
+        if (daysSincePeak >= 1 && latest < peakVal) {  // at least a full day of real decline since the peak
+          liveData[site].decayPerDay = (peakVal - latest) / daysSincePeak;  // positive number = CFS lost per day
         } else {
           liveData[site].decayPerDay = null;
         }
@@ -1661,17 +1669,17 @@ function currentCondHtml(t) {
 
   let html = `<div class="modal-row"><b>Current flow:</b> ${flow.toLocaleString()} CFS &nbsp;${condBadge(cond)}${curRange ? sub('(' + curRange + ')') : ''}</div>`;
 
-  // "Days until next level" — only when genuinely falling, with a sane 7-day-based rate
+  // "Days until next level" — only when genuinely falling, with a sane rate
   const decayPerDay = d?.decayPerDay;
   if (decayPerDay && decayPerDay > 0 && cond !== 'below' && cond !== 'nodata') {
     const nextThreshold = { above: t.high, high: t.medium, medium: t.low, low: t.below }[cond];
-    const nextCondName  = { above: 'High', high: 'Medium', medium: 'Low', low: 'Below' }[cond];
+    const nextCond      = { above: 'high', high: 'medium', medium: 'low', low: 'below' }[cond];
     const thr = parseFloat(nextThreshold);
     if (!isNaN(thr) && flow > thr) {
       const days = (flow - thr) / decayPerDay;
       if (days > 0 && days <= 30) {
         const daysText = days < 1 ? 'less than a day' : '~' + Math.round(days) + (Math.round(days) === 1 ? ' day' : ' days');
-        html += `<div class="modal-row" style="font-size:0.85rem;color:var(--subtext)">Falling ~${Math.round(decayPerDay).toLocaleString()} CFS/day — ${nextCondName} in ${daysText} if no rain</div>`;
+        html += `<div class="modal-row" style="font-size:0.85rem;color:var(--subtext)">${condBadge(nextCond)} in ${daysText} if no rain</div>`;
       }
     }
   }
